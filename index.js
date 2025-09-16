@@ -45,3 +45,45 @@ client.on('messageCreate', async message => {
 });
 
 client.login(process.env.DISCORD_TOKEN);
+
+// ===== 提供 Dashboard 取得 guilds & channels 的 API =====
+import express from 'express';
+import cors from 'cors';
+const dashboardApi = express();
+dashboardApi.use(cors());
+dashboardApi.use(express.json());
+
+// 取得所有 guilds
+dashboardApi.get('/api/guilds', (req, res) => {
+  const guilds = client.guilds.cache.map(g => ({ id: g.id, name: g.name }));
+  res.json(guilds);
+});
+
+// 取得指定 guild 的所有 text channels
+dashboardApi.get('/api/guilds/:guildId/channels', (req, res) => {
+  const guild = client.guilds.cache.get(req.params.guildId);
+  if (!guild) return res.status(404).json({ error: 'Guild not found' });
+  const channels = guild.channels.cache
+    .filter(ch => ch.type === 0) // 0 = text channel
+    .map(ch => ({ id: ch.id, name: ch.name }));
+  res.json(channels);
+});
+
+// 範例：在指定頻道發送訊息
+dashboardApi.post('/api/send', async (req, res) => {
+  const { guildId, channelId, content } = req.body;
+  try {
+    const guild = client.guilds.cache.get(guildId);
+    if (!guild) throw new Error('Guild not found');
+    const channel = guild.channels.cache.get(channelId);
+    if (!channel) throw new Error('Channel not found');
+    await channel.send(content);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+dashboardApi.listen(3030, () => {
+  console.log('Bot API server running at http://localhost:3030');
+});

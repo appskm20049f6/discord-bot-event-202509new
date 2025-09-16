@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <title>Discord Bot Dashboard</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f4f4f4; }
+    .container { max-width: 600px; margin: 40px auto; background: #fff; padding: 24px; border-radius: 8px; box-shadow: 0 2px 8px #ccc; }
+    h1 { text-align: center; }
+    .category { margin: 16px 0; }
+    button { padding: 8px 16px; margin: 8px; border-radius: 4px; border: none; background: #007bff; color: #fff; cursor: pointer; }
+    button:hover { background: #0056b3; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Discord Bot Dashboard</h1>
+    <div>
+      <label>選擇伺服器：</label>
+      <select id="guilds"></select>
+      <label>選擇頻道：</label>
+      <select id="channels"></select>
+      <input id="msg" type="text" placeholder="輸入訊息" style="width:60%" />
+      <button onclick="sendMsg()">發送訊息</button>
+    </div>
+    <div id="categories"></div>
+    <div id="actions"></div>
+  </div>
+  <script>
+    // 取得伺服器列表
+    fetch('http://localhost:3030/api/guilds')
+      .then(res => res.json())
+      .then(guilds => {
+        const guildSel = document.getElementById('guilds');
+        guilds.forEach(g => {
+          const opt = document.createElement('option');
+          opt.value = g.id;
+          opt.textContent = g.name;
+          guildSel.appendChild(opt);
+        });
+        if (guilds.length) loadChannels(guilds[0].id);
+      });
+
+    document.getElementById('guilds').onchange = e => {
+      loadChannels(e.target.value);
+    };
+
+    function loadChannels(guildId) {
+      fetch(`http://localhost:3030/api/guilds/${guildId}/channels`)
+        .then(res => res.json())
+        .then(channels => {
+          const chSel = document.getElementById('channels');
+          chSel.innerHTML = '';
+          channels.forEach(ch => {
+            const opt = document.createElement('option');
+            opt.value = ch.id;
+            opt.textContent = ch.name;
+            chSel.appendChild(opt);
+          });
+        });
+    }
+
+    function sendMsg() {
+      const guildId = document.getElementById('guilds').value;
+      const channelId = document.getElementById('channels').value;
+      const content = document.getElementById('msg').value;
+      fetch('http://localhost:3030/api/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ guildId, channelId, content })
+      })
+      .then(res => res.json())
+      .then(result => {
+        if(result.success) alert('訊息已發送！');
+        else alert('發送失敗: ' + result.error);
+      });
+    }
+  </script>
+</body>
+</html>
