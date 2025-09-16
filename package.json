@@ -1,0 +1,14 @@
+{
+  "name": "dc-longtime-bot",
+  "version": "1.0.0",
+  "description": "A Discord bot using latest discord.js",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "discord.js": "^14.22.1",
+    "dotenv": "^17.2.2"
+  }
+}
