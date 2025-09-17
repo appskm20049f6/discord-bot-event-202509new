@@ -127,27 +127,26 @@ app.post('/api/start-lottery-event', async (req, res) => {
         }
         await channel.send(`⌛【任務結束】\n${resultMsg}`);
 
-        // ====== 寫入 Excel 檔案 ======
-        const workbook = new ExcelJS.Workbook();
-        const sheet = workbook.addWorksheet('抽獎紀錄');
-        sheet.addRow(['題目', question]);
-        sheet.addRow(['選項', options.join(' | ')]);
-        sheet.addRow(['正確答案', answer]);
-        sheet.addRow(['抽獎人數', winners]);
-        sheet.addRow([]);
-        sheet.addRow(['DC名稱', 'ID', '回答內容', '回答時間']);
+        // ====== 寫入 CSV 檔案 ======
+        const dt = new Date(startTime);
+        const dateStr = dt.toLocaleDateString('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '-');
+        const timeStr = dt.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).replace(/:/g, '-');
+        const shortQ = question.replace(/\s+/g, '').slice(0, 10);
+        const fileName = `【${dateStr}】${shortQ}_${timeStr}.csv`;
+        const filePath = path.join('data', fileName);
+        let csv = '';
+        csv += `題目,${question}\n`;
+        csv += `選項,${options.join(' | ')}\n`;
+        csv += `正確答案,${answer}\n`;
+        csv += `抽獎人數,${winners}\n`;
+        csv += `\n`;
+        csv += `DC名稱,ID,回答內容,回答時間\n`;
         Object.values(userAnswers).forEach(u => {
-          sheet.addRow([u.name, u.id, u.answer, u.time]);
+          csv += `${u.name},${u.id},${u.answer},${u.time}\n`;
         });
-  const dt = new Date(startTime);
-  const dateStr = dt.toLocaleDateString('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '-');
-  const timeStr = dt.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).replace(/:/g, '-');
-  // 題目只取前10字避免檔名過長
-  const shortQ = question.replace(/\s+/g, '').slice(0, 10);
-  const fileName = `【${dateStr}】${shortQ}_${timeStr}.xlsx`;
-  const filePath = path.join('data', fileName);
-  await workbook.xlsx.writeFile(filePath);
+        fs.writeFileSync(filePath, csv, 'utf8');
       } catch (err) {
+        console.error('抽獎活動回溯錯誤:', err);
         await channel.send('抽獎活動結束，但回溯訊息時發生錯誤。');
       }
       currentLottery = null;
@@ -164,7 +163,7 @@ app.get('/api/lottery', (req, res) => {
   const dir = path.join(__dirname, 'data');
   if (!fs.existsSync(dir)) return res.json([]);
   const files = fs.readdirSync(dir)
-    .filter(f => f.endsWith('.xlsx'))
+    .filter(f => f.endsWith('.csv'))
     .map(f => ({
       name: f,
       url: `/data/${f}`

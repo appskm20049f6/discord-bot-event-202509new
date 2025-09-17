@@ -43,14 +43,14 @@ fetch('/api/lottery')
 			fileList.innerHTML = '<div>目前尚無抽獎活動紀錄。</div>';
 			return;
 		}
-		fileList.innerHTML = list.map(item => {
-			// 檔名格式：【日期】題目_時間.xlsx
-			const match = item.name.match(/^【(.+?)】(.+?)_(.+?)\.xlsx$/);
-			const date = match ? match[1] : '';
-			const title = match ? match[2] : item.name;
-			const time = match ? match[3].replace(/-/g, ':') : '';
-			return `<button class="file-btn" data-url="${item.url}" data-name="${item.name}">${date}｜${title}｜${time}</button>`;
-		}).join('');
+			fileList.innerHTML = list.map(item => {
+				// 檔名格式：【日期】題目_時間.csv
+				const match = item.name.match(/^【(.+?)】(.+?)_(.+?)\.csv$/);
+				const date = match ? match[1] : '';
+				const title = match ? match[2] : item.name;
+				const time = match ? match[3].replace(/-/g, ':') : '';
+				return `<button class="file-btn" data-url="${item.url}" data-name="${item.name}">${date}｜${title}｜${time}</button>`;
+			}).join('');
 		document.querySelectorAll('.file-btn').forEach(btn => {
 			btn.onclick = () => showAnalysis(btn.dataset.url, btn.dataset.name);
 		});

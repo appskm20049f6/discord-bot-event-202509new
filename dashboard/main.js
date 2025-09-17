@@ -98,11 +98,16 @@ function initLottery() {
     fetch('/api/lottery')
       .then(res => res.json())
       .then(list => {
-        document.getElementById('lotteryList').innerHTML =
-          list.map(item => `<div>活動：${item.name}</div>`).join('');
+        const fileList = document.getElementById('file-list');
+        if (fileList) {
+          fileList.innerHTML = list.map(item => `<div>活動：${item.name}</div>`).join('');
+        }
       })
       .catch(err => {
-        document.getElementById('lotteryList').innerHTML = `⚠️ 載入失敗：${err.message}`;
+        const fileList = document.getElementById('file-list');
+        if (fileList) {
+          fileList.innerHTML = `⚠️ 載入失敗：${err.message}`;
+        }
       });
   };
 }
