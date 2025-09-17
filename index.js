@@ -158,6 +158,19 @@ app.post('/api/start-lottery-event', async (req, res) => {
 });
 
 app.listen(3030, () => {
+// API: 刪除指定 CSV 檔案
+app.delete('/api/delete-csv', (req, res) => {
+  const fileName = req.query.name;
+  if (!fileName) return res.status(400).json({ error: '缺少檔名' });
+  const filePath = path.join(__dirname, 'data', fileName);
+  if (!fs.existsSync(filePath)) return res.status(404).json({ error: '檔案不存在' });
+  try {
+    fs.unlinkSync(filePath);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: '刪除失敗' });
+  }
+});
 // API: 取得所有抽獎 Excel 檔案列表
 app.get('/api/lottery', (req, res) => {
   const dir = path.join(__dirname, 'data');
