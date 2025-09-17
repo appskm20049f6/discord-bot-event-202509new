@@ -1,4 +1,5 @@
 // Discord Bot + Express 後台主程式
+import { fileURLToPath } from 'url';
 import { Client, GatewayIntentBits } from 'discord.js';
 import dotenv from 'dotenv';
 import express from 'express';
@@ -7,6 +8,7 @@ import open from 'open';
 import ExcelJS from 'exceljs';
 import fs from 'fs';
 import path from 'path';
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config();
 
 const client = new Client({
@@ -96,16 +98,19 @@ app.post('/api/start-lottery-event', async (req, res) => {
           if (messages.size < 100) break;
           lastId = messages.last().id;
         }
-        // 收集有效回答（只保留第一次）
+        // 收集有效回答（只保留每人最早一次）
         const validLabels = optionLabels.slice(0, options.length);
+        // 依訊息時間排序，先出現者優先
+        const sortedMsgs = fetched
+          .filter(msg => validLabels.includes(msg.content.trim().toUpperCase()))
+          .sort((a, b) => a.createdTimestamp - b.createdTimestamp);
         const userAnswers = {};
-        fetched.forEach(msg => {
-          const ans = msg.content.trim().toUpperCase();
-          if (validLabels.includes(ans) && !userAnswers[msg.author.id]) {
+        sortedMsgs.forEach(msg => {
+          if (!userAnswers[msg.author.id]) {
             userAnswers[msg.author.id] = {
               name: msg.author.username,
               id: msg.author.id,
-              answer: ans,
+              answer: msg.content.trim().toUpperCase(),
               time: new Date(msg.createdTimestamp).toISOString()
             };
           }
@@ -134,9 +139,14 @@ app.post('/api/start-lottery-event', async (req, res) => {
         Object.values(userAnswers).forEach(u => {
           sheet.addRow([u.name, u.id, u.answer, u.time]);
         });
-        const fileName = `lottery_${new Date(startTime).toISOString().replace(/[:.]/g,'-')}.xlsx`;
-        const filePath = path.join('data', fileName);
-        await workbook.xlsx.writeFile(filePath);
+  const dt = new Date(startTime);
+  const dateStr = dt.toLocaleDateString('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '-');
+  const timeStr = dt.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).replace(/:/g, '-');
+  // 題目只取前10字避免檔名過長
+  const shortQ = question.replace(/\s+/g, '').slice(0, 10);
+  const fileName = `【${dateStr}】${shortQ}_${timeStr}.xlsx`;
+  const filePath = path.join('data', fileName);
+  await workbook.xlsx.writeFile(filePath);
       } catch (err) {
         await channel.send('抽獎活動結束，但回溯訊息時發生錯誤。');
       }
@@ -149,6 +159,20 @@ app.post('/api/start-lottery-event', async (req, res) => {
 });
 
 app.listen(3030, () => {
+// API: 取得所有抽獎 Excel 檔案列表
+app.get('/api/lottery', (req, res) => {
+  const dir = path.join(__dirname, 'data');
+  if (!fs.existsSync(dir)) return res.json([]);
+  const files = fs.readdirSync(dir)
+    .filter(f => f.endsWith('.xlsx'))
+    .map(f => ({
+      name: f,
+      url: `/data/${f}`
+    }));
+  res.json(files);
+});
+// 提供 Excel 檔案下載
+app.use('/data', express.static(path.join(__dirname, 'data')));
   console.log('Bot API server running at http://localhost:3030');
   open('http://localhost:3030/dashboard/index.html');
 });
