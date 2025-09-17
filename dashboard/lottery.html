@@ -1,4 +1,25 @@
-<div style="padding:24px;">
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <title>抽獎管理</title>
+  <style>
+    body { background:#fff; font-family:Arial,sans-serif; }
+    .lottery-container { max-width:480px; margin:40px auto; background:#fff; border-radius:16px; box-shadow:0 4px 24px #0001; padding:32px 32px 24px 32px; }
+    h2 { font-size:28px; margin-bottom:24px; }
+    .tab-btn { padding:8px 24px; border:none; border-radius:6px 6px 0 0; background:#eee; color:#333; font-weight:bold; margin-right:4px; cursor:pointer; }
+    .tab-btn.active { background:#007bff; color:#fff; }
+    .form-group { margin-bottom:18px; }
+    label { font-weight:bold; color:#222; margin-bottom:6px; display:block; }
+    .select-box { width:100%; padding:12px 16px; border-radius:8px; border:1px solid #ccc; font-size:16px; background:#f8f8f8; box-sizing:border-box; }
+    .option-row { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+    .option-label { font-weight:bold; width:32px; text-align:right; }
+    .submit-btn { width:100%; padding:14px 0; border-radius:8px; background:#007bff; color:#fff; font-size:18px; font-weight:bold; border:none; cursor:pointer; margin-top:12px; }
+    #lotteryCreateResult { margin-top:16px; }
+  </style>
+</head>
+<body>
+<div class="lottery-container">
   <h2>抽獎管理</h2>
   <div style="margin-bottom:24px;">
     <button id="tab-create" class="tab-btn active" onclick="showTab('create')">創建新活動</button>
@@ -7,31 +28,36 @@
 
   <!-- 建立活動 -->
   <div id="tab-create-content">
-    <form id="lotteryForm" style="max-width:400px;">
-      <div style="margin-bottom:16px;">
+    <form id="lotteryForm">
+      <div class="form-group">
         <label>題目：</label>
         <input type="text" id="lotteryTitle" class="select-box" placeholder="請輸入抽獎題目" required />
       </div>
-      <div style="margin-bottom:16px;">
+      <div class="form-group">
         <label>選項：</label>
-        <div id="optionList"></div>
-
+        <div id="optionList">
+          <div class="option-row"><span class="option-label">A：</span><input type="text" class="select-box" name="optionA" placeholder="選項A"></div>
+          <div class="option-row"><span class="option-label">B：</span><input type="text" class="select-box" name="optionB" placeholder="選項B"></div>
+          <div class="option-row"><span class="option-label">C：</span><input type="text" class="select-box" name="optionC" placeholder="選項C"></div>
+          <div class="option-row"><span class="option-label">D：</span><input type="text" class="select-box" name="optionD" placeholder="選項D"></div>
+        </div>
+        <small style="color:#888;">最多4個選項，空白欄位不會送出</small>
       </div>
-      <div style="margin-bottom:16px;">
+      <div class="form-group">
         <label>設定答案：</label>
         <input type="text" id="lotteryAnswer" class="select-box" placeholder="請輸入正確答案 (如 A、B)" required />
       </div>
-      <div style="margin-bottom:16px;">
+      <div class="form-group">
         <label>設定回答時間（秒）：</label>
         <input type="number" id="lotteryTime" class="select-box" min="1" value="30" required />
       </div>
-      <div style="margin-bottom:16px;">
+      <div class="form-group">
         <label>設定抽獎人數：</label>
         <input type="number" id="lotteryWinnerCount" class="select-box" min="1" value="1" required />
       </div>
-      <button type="submit" class="select-box" style="background:#007bff;color:#fff;font-weight:bold;">發布</button>
+      <button type="button" class="submit-btn" onclick="submitLottery()">發布</button>
     </form>
-    <div id="lotteryCreateResult" style="margin-top:16px;"></div>
+    <div id="lotteryCreateResult"></div>
   </div>
 
   <!-- 活動紀錄 -->
@@ -40,49 +66,6 @@
   </div>
 </div>
 <script>
-// lottery.js 內容直接嵌入
-let optionCount = 2;
-const optionLabels = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
-const optionList = document.getElementById('optionList');
-function renderOptions() {
-  optionList.innerHTML = '';
-  for (let i = 0; i < optionCount; i++) {
-    const wrapper = document.createElement('div');
-    wrapper.style.display = 'flex';
-    wrapper.style.alignItems = 'center';
-    const label = document.createElement('span');
-    label.textContent = optionLabels[i] + ':';
-    label.style.fontWeight = 'bold';
-    label.style.marginRight = '8px';
-    wrapper.appendChild(label);
-    const input = document.createElement('input');
-    input.type = 'text';
-    input.className = 'select-box';
-    input.placeholder = `請輸入選項內容`;
-    input.required = true;
-    input.name = `option${i + 1}`;
-    input.style.flex = '1';
-    input.oninput = () => {
-      if (i === optionCount - 1 && optionCount < 4 && input.value.trim() !== '') {
-        optionCount++;
-        renderOptions();
-      }
-    };
-    wrapper.appendChild(input);
-    optionList.appendChild(wrapper);
-  }
-}
-function loadLotteryList() {
-  fetch('/api/lottery')
-    .then(res => res.json())
-    .then(list => {
-      document.getElementById('lotteryList').innerHTML =
-        list.map(item => `<div>活動：${item.name}</div>`).join('');
-    })
-    .catch(err => {
-      document.getElementById('lotteryList').innerHTML = `⚠️ 載入失敗：${err.message}`;
-    });
-}
 function showTab(tab) {
   document.getElementById('tab-create').classList.remove('active');
   document.getElementById('tab-history').classList.remove('active');
@@ -97,22 +80,33 @@ function showTab(tab) {
     loadLotteryList();
   }
 }
-document.getElementById('lotteryForm').onsubmit = async function (e) {
-  e.preventDefault();
+function loadLotteryList() {
+  fetch('/api/lottery')
+    .then(res => res.json())
+    .then(list => {
+      document.getElementById('lotteryList').innerHTML =
+        list.map(item => `<div>活動：${item.name}</div>`).join('');
+    })
+    .catch(err => {
+      document.getElementById('lotteryList').innerHTML = `⚠️ 載入失敗：${err.message}`;
+    });
+}
+function submitLottery() {
   const title = document.getElementById('lotteryTitle').value;
   const answer = document.getElementById('lotteryAnswer').value;
   const time = document.getElementById('lotteryTime').value;
   const winnerCount = document.getElementById('lotteryWinnerCount').value;
-  const options = Array.from(optionList.querySelectorAll('input')).map(i => i.value).filter(Boolean);
+  const options = ['optionA','optionB','optionC','optionD'].map(n => document.getElementsByName(n)[0].value.trim()).filter(Boolean);
   const channelId = window.parent && window.parent.document
     ? window.parent.document.getElementById('channels')?.value
     : (document.getElementById('channels') ? document.getElementById('channels').value : null);
+  console.log('送出抽獎', { channelId, options });
   if (!channelId) {
     document.getElementById('lotteryCreateResult').textContent = '⚠️ 請先選擇發布頻道';
     return;
   }
   try {
-    const res = await fetch('/api/start-lottery-event', {
+    fetch('/api/start-lottery-event', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -123,20 +117,22 @@ document.getElementById('lotteryForm').onsubmit = async function (e) {
         winners: Number(winnerCount),
         channelId
       })
+    })
+    .then(res => res.json())
+    .then(result => {
+      console.log('API回傳', result);
+      if (result.success) {
+        document.getElementById('lotteryCreateResult').textContent = '✅ 抽獎活動已發布！';
+        document.getElementById('lotteryForm').reset();
+        loadLotteryList();
+      } else {
+        document.getElementById('lotteryCreateResult').textContent = '❌ 發布失敗：' + (result.error || '未知錯誤');
+      }
     });
-    const result = await res.json();
-    if (result.success) {
-      document.getElementById('lotteryCreateResult').textContent = '✅ 抽獎活動已發布！';
-      document.getElementById('lotteryForm').reset();
-      optionCount = 2;
-      renderOptions();
-      loadLotteryList();
-    } else {
-      document.getElementById('lotteryCreateResult').textContent = '❌ 發布失敗：' + (result.error || '未知錯誤');
-    }
   } catch (err) {
     document.getElementById('lotteryCreateResult').textContent = '❌ 發布失敗：' + err.message;
   }
-};
-renderOptions();
+}
 </script>
+</body>
+</html>

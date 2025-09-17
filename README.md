@@ -1,4 +1,3 @@
-
 # Discord Bot + 後台管理系統
 
 本專案結合 Discord Bot（discord.js v14）與 Express 後台 API，並提供分頁式 Dashboard 前端，方便管理與互動。

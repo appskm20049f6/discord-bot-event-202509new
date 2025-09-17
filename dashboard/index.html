@@ -23,19 +23,8 @@
     .select-group { display: flex; flex-direction: column; gap: 10px; }
     .select-group label { font-weight: bold; color: #333; font-size: 16px; }
     .select-box, #channelSearch {
-      width: 100%;
-      min-width: 0;
-      max-width: 100%;
-      padding: 12px 16px;
-      border-radius: 10px;
-      border: 1px solid #ccc;
-      font-size: 17px;
-      background: #f8f8f8;
-      box-sizing: border-box;
-      margin: 0;
-      display: block;
+      width: 100%; min-width: 0; max-width: 100%; padding: 12px 16px; border-radius: 10px; border: 1px solid #ccc; font-size: 17px; background: #f8f8f8; box-sizing: border-box; margin: 0; display: block;
     }
-    .select-box:focus, #channelSearch:focus { border-color: #007bff; outline: none; }
     .sidebar .menu { list-style:none; padding:0; margin-top:24px; }
     .sidebar .menu li { padding:18px 28px; cursor:pointer; font-size:17px; border-radius:8px; margin-bottom:8px; transition:background 0.2s; }
     .sidebar .menu li.active, .sidebar .menu li:hover { background:#007bff; color:#fff; }
@@ -45,15 +34,15 @@
 <body>
   <div class="container">
     <div class="sidebar">
-      <div class="card-select" style="min-width:200px;max-width:220px;margin:0 auto 32px auto;">
-        <div class="select-group" style="margin-bottom:12px;">
+      <div class="card-select">
+        <div class="select-group">
           <label for="guilds">選擇DC伺服器</label>
-          <select id="guilds" class="select-box" style="min-width:100%;font-size:16px;"></select>
+          <select id="guilds" class="select-box"></select>
         </div>
-        <div class="select-group" style="margin-bottom:12px;">
+        <div class="select-group">
           <label for="channels">選擇發布頻道</label>
-          <input id="channelSearch" class="select-box" type="text" placeholder="搜尋頻道名稱..." style="margin-bottom:8px;min-width:100%;font-size:16px;" />
-          <select id="channels" class="select-box" style="min-width:100%;font-size:16px;"></select>
+          <input id="channelSearch" class="select-box" type="text" placeholder="搜尋頻道名稱..." />
+          <select id="channels" class="select-box"></select>
         </div>
       </div>
       <h3>管理工具</h3>
@@ -63,7 +52,8 @@
       </ul>
     </div>
     <div class="main" id="main-content">
-      <!-- AJAX 載入內容 -->
+      <h2 style="margin-top:0;">歡迎使用 Discord Bot 後台管理系統</h2>
+      <p>請從左側選單選擇功能分頁。</p>
     </div>
   </div>
   <script>
@@ -81,12 +71,9 @@
         });
         if (guilds.length) loadChannels(guilds[0].id);
       });
-
     document.getElementById('guilds').onchange = e => {
       loadChannels(e.target.value);
     };
-
-    // 載入頻道選單
     let allChannels = [];
     function loadChannels(guildId) {
       fetch(`/api/guilds/${guildId}/channels`)
@@ -96,8 +83,6 @@
           renderChannelOptions('');
         });
     }
-
-    // 搜尋式頻道選單
     function renderChannelOptions(keyword) {
       const chSel = document.getElementById('channels');
       chSel.innerHTML = '';
@@ -109,12 +94,10 @@
         chSel.appendChild(opt);
       });
     }
-
     document.getElementById('channelSearch').addEventListener('input', e => {
       renderChannelOptions(e.target.value);
     });
-
-    // 工具頁 AJAX 載入
+    // 單頁式分頁切換
     function loadPage(page) {
       document.querySelectorAll('.menu li').forEach(li => li.classList.remove('active'));
       document.getElementById('menu-' + page).classList.add('active');
@@ -122,8 +105,72 @@
         .then(res => res.text())
         .then(html => {
           document.getElementById('main-content').innerHTML = html;
+          if (page === 'lottery') initLottery();
+          if (page === 'vote') initVote();
         });
     }
+    // 分頁 JS 集中於主頁
+    function initLottery() {
+      // 初始化抽獎分頁互動
+      window.submitLottery = function() {
+        const title = document.getElementById('lotteryTitle').value;
+        const answer = document.getElementById('lotteryAnswer').value;
+        const time = document.getElementById('lotteryTime').value;
+        const winnerCount = document.getElementById('lotteryWinnerCount').value;
+        const options = ['optionA','optionB','optionC','optionD'].map(n => document.getElementsByName(n)[0].value.trim()).filter(Boolean);
+        const channelId = document.getElementById('channels')?.value;
+        if (!channelId) {
+          document.getElementById('lotteryCreateResult').textContent = '⚠️ 請先選擇發布頻道';
+          return;
+        }
+        fetch('/api/start-lottery-event', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            question: title,
+            options,
+            answer,
+            countdown: Number(time),
+            winners: Number(winnerCount),
+            channelId
+          })
+        })
+        .then(res => res.json())
+        .then(result => {
+          if (result.success) {
+            document.getElementById('lotteryCreateResult').textContent = '✅ 抽獎活動已發布！';
+            document.getElementById('lotteryForm').reset();
+            loadLotteryList();
+          } else {
+            document.getElementById('lotteryCreateResult').textContent = '❌ 發布失敗：' + (result.error || '未知錯誤');
+          }
+        });
+      };
+      window.loadLotteryList = function() {
+        fetch('/api/lottery')
+          .then(res => res.json())
+          .then(list => {
+            document.getElementById('lotteryList').innerHTML =
+              list.map(item => `<div>活動：${item.name}</div>`).join('');
+          })
+          .catch(err => {
+            document.getElementById('lotteryList').innerHTML = `⚠️ 載入失敗：${err.message}`;
+          });
+      };
+    }
+    function initVote() {
+      // 初始化投票分頁互動
+      window.createVote = function() {
+        alert('這裡可以彈出新建投票的表單');
+      };
+      fetch('/api/vote')
+        .then(res => res.json())
+        .then(list => {
+          document.getElementById('voteList').innerHTML =
+            list.map(item => `<div>投票：${item.name}</div>`).join('');
+        });
+    }
+    // 預設載入抽獎分頁
     loadPage('lottery');
   </script>
 </body>
