@@ -54,6 +54,7 @@ function loadPage(page) {
       document.getElementById('main-content').innerHTML = html;
       if (page === 'lottery') initLottery();
       if (page === 'vote') initVote();
+      if (page === 'record') initLotteryRecord();
       // 活動紀錄頁載入 lottery-record.html 到主內容區，不跳轉整個頁面
     });
 }
@@ -122,6 +123,81 @@ function initVote() {
       document.getElementById('voteList').innerHTML =
         list.map(item => `<div>投票：${item.name}</div>`).join('');
     });
+}
+window.initLotteryRecord = function() {
+  const fileList = document.getElementById('file-list');
+  const analysisArea = document.getElementById('analysis-area');
+  if (!fileList) return;
+  fetch('/api/lottery')
+    .then(res => res.json())
+    .then(list => {
+      if (!list.length) {
+        fileList.innerHTML = '<div>目前尚無抽獎活動紀錄。</div>';
+        return;
+      }
+      fileList.innerHTML = list.map(item => {
+        const match = item.name.match(/^【([^】]+)】([^_]+)_(.+?)\.csv$/);
+        const date = match ? match[1] : '';
+        const title = match ? match[2] : item.name;
+        const time = match ? match[3].replace(/-/g, ':') : '';
+        const btnText = match ? `${date}｜${title}｜${time}` : item.name;
+        return `<button class="file-btn" data-url="${item.url}" data-name="${item.name}">${btnText}</button>`;
+      }).join('');
+      document.querySelectorAll('.file-btn').forEach(btn => {
+        btn.onclick = () => showAnalysis(btn.dataset.url, btn.dataset.name);
+      });
+    });
+  async function showAnalysis(fileUrl, fileName) {
+    fileList.style.display = 'none';
+    analysisArea.style.display = '';
+    analysisArea.innerHTML = `<button class='back-btn' onclick='backToList()'>← 返回紀錄列表</button><div>載入中...</div>`;
+    try {
+      const res = await fetch(fileUrl);
+      if (!res.ok) throw new Error('檔案載入失敗');
+      const text = await res.text();
+      const lines = text.split(/\r?\n/).filter(l => l.trim());
+      let optionLine = lines.find(l => l.startsWith('選項,'));
+      let options = optionLine ? optionLine.replace('選項,','').split(' | ') : [];
+      let answerStart = lines.findIndex(l => l.startsWith('DC名稱,'));
+      let answerRows = answerStart >= 0 ? lines.slice(answerStart+1) : [];
+      let counts = {};
+      options.forEach(opt => {
+        let label = opt.match(/^([A-Z])\./) ? opt.match(/^([A-Z])\./)[1] : opt;
+        counts[label] = 0;
+      });
+      answerRows.forEach(row => {
+        let cols = row.split(',');
+        let ans = cols[2];
+        if (counts.hasOwnProperty(ans)) counts[ans]++;
+      });
+      const labels = Object.keys(counts);
+      const data = labels.map(l => counts[l]);
+      analysisArea.innerHTML = `<button class='back-btn' onclick='backToList()'>← 返回紀錄列表</button>
+        <div style='margin-bottom:18px;font-size:20px;font-weight:bold;'>${fileName}</div>
+        <div class='chart-container'><canvas id='answerChart'></canvas></div>`;
+      new Chart(document.getElementById('answerChart'), {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [{
+            label: '回答人數',
+            data,
+            backgroundColor: ['#007bff','#00c6ff','#ffc107','#dc3545','#28a745','#6f42c1','#fd7e14']
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: { legend: { display: false } }
+        }
+      });
+    } catch (err) {
+      analysisArea.innerHTML = `<button class='back-btn' onclick='backToList()'>← 返回紀錄列表</button><div style='color:red;'>載入失敗：${err.message}</div>`;
+    }
+  }
+  window.backToList = function() {
+    fileList.style.display = '';
+    analysisArea.style.display = 'none';
+  }
 }
 // 預設載入抽獎分頁
 loadPage('lottery');
