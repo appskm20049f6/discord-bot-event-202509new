@@ -1,1 +1,95 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+	<meta charset="UTF-8">
+	<title>抽獎紀錄</title>
+	<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+	<style>
+		body { background:#fff; font-family:Arial,sans-serif; }
+		.lottery-container { max-width:480px; margin:40px auto; background:#fff; border-radius:16px; box-shadow:0 4px 24px #0001; padding:32px 32px 24px 32px; }
+		h2 { font-size:28px; margin-bottom:24px; }
+		.file-list { display: flex; flex-wrap: wrap; gap: 18px; margin-top: 32px; }
+		.file-btn {
+			background: linear-gradient(90deg,#007bff 60%,#00c6ff 100%);
+			color: #fff;
+			border: none;
+			border-radius: 10px;
+			padding: 18px 32px;
+			font-size: 18px;
+			font-weight: bold;
+			cursor: pointer;
+			box-shadow: 0 2px 8px #007bff33;
+			transition: background 0.2s, transform 0.2s;
+		}
+		.file-btn:hover { background: linear-gradient(90deg,#0056b3 60%,#00aaff 100%); transform: scale(1.04); }
+		.analysis-area { margin-top: 40px; }
+		.chart-container { max-width: 400px; margin: 0 auto; }
+		.back-btn { margin-bottom: 24px; background: #eee; color: #333; border: none; border-radius: 6px; padding: 8px 18px; font-size: 16px; cursor: pointer; }
+		.back-btn:hover { background: #ccc; }
+	</style>
+</head>
+<body>
+<div class="lottery-container">
+	<h2>抽獎紀錄</h2>
+	<div id="file-list" class="file-list"></div>
+	<div id="analysis-area" class="analysis-area" style="display:none;"></div>
+</div>
+<script>
+fetch('/api/lottery')
+	.then(res => res.json())
+	.then(list => {
+		const fileList = document.getElementById('file-list');
+		if (!list.length) {
+			fileList.innerHTML = '<div>目前尚無抽獎活動紀錄。</div>';
+			return;
+		}
+		fileList.innerHTML = list.map(item => {
+			// 檔名格式：【日期】題目_時間.xlsx
+			const match = item.name.match(/^【(.+?)】(.+?)_(.+?)\.xlsx$/);
+			const date = match ? match[1] : '';
+			const title = match ? match[2] : item.name;
+			const time = match ? match[3].replace(/-/g, ':') : '';
+			return `<button class="file-btn" data-url="${item.url}" data-name="${item.name}">${date}｜${title}｜${time}</button>`;
+		}).join('');
+		document.querySelectorAll('.file-btn').forEach(btn => {
+			btn.onclick = () => showAnalysis(btn.dataset.url, btn.dataset.name);
+		});
+	});
+function showAnalysis(fileUrl, fileName) {
+	const fileList = document.getElementById('file-list');
+	const analysisArea = document.getElementById('analysis-area');
+	fileList.style.display = 'none';
+	analysisArea.style.display = '';
+	analysisArea.innerHTML = `<button class='back-btn' onclick='backToList()'>← 返回紀錄列表</button><div>載入中...</div>`;
+	setTimeout(() => {
+		analysisArea.innerHTML = `<button class='back-btn' onclick='backToList()'>← 返回紀錄列表</button>
+			<div style='margin-bottom:18px;font-size:20px;font-weight:bold;'>${fileName}</div>
+			<div class='chart-container'><canvas id='answerChart'></canvas></div>`;
+		// 範例資料
+		const labels = ['A', 'B', 'C', 'D'];
+		const data = [12, 8, 5, 3];
+		new Chart(document.getElementById('answerChart'), {
+			type: 'bar',
+			data: {
+				labels,
+				datasets: [{
+					label: '回答人數',
+					data,
+					backgroundColor: ['#007bff','#00c6ff','#ffc107','#dc3545']
+				}]
+			},
+			options: {
+				responsive: true,
+				plugins: { legend: { display: false } }
+			}
+		});
+	}, 600);
+}
+function backToList() {
+	document.getElementById('file-list').style.display = '';
+	document.getElementById('analysis-area').style.display = 'none';
+}
+</script>
+</body>
+</html>
 
