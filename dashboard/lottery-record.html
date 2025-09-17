@@ -34,37 +34,4 @@
 	<div id="file-list" class="file-list"></div>
 	<div id="analysis-area" class="analysis-area" style="display:none;"></div>
 </div>
-<script>
-fetch('/api/lottery')
-	.then(res => res.json())
-	.then(list => {
-		console.log('API list:', list);
-		const fileList = document.getElementById('file-list');
-		if (!list.length) {
-			fileList.innerHTML = '<div>目前尚無抽獎活動紀錄。</div>';
-			return;
-		}
-		fileList.innerHTML = list.map(item => {
-			// 檔名格式：【日期】題目_時間.csv，允許中括號、中文
-			const match = item.name.match(/^【([^】]+)】([^_]+)_(.+?)\.csv$/);
-			const date = match ? match[1] : '';
-			const title = match ? match[2] : item.name;
-			const time = match ? match[3].replace(/-/g, ':') : '';
-			// 防呆：若解析失敗，直接顯示原檔名
-			const btnText = match ? `${date}｜${title}｜${time}` : item.name;
-			return `<button class="file-btn" data-url="${item.url}" data-name="${item.name}">${btnText}</button>`;
-		}).join('');
-		document.querySelectorAll('.file-btn').forEach(btn => {
-			btn.onclick = () => showAnalysis(btn.dataset.url, btn.dataset.name);
-		});
-	});
-async function showAnalysis(fileUrl, fileName) {
-	const fileList = document.getElementById('file-list');
-	const analysisArea = document.getElementById('analysis-area');
-	fileList.style.display = 'none';
-	analysisArea.style.display = '';
-	analysisArea.innerHTML = `<button class='back-btn' onclick='backToList()'>← 返回紀錄列表</button><div>載入中...</div>`;
-	try {
-		const res = await fetch(fileUrl);
-
-		if (!res.ok) throw new Error('檔案載入失敗');
+<!-- Removed all script tags and JavaScript code -->

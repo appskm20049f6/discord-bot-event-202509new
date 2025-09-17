@@ -160,9 +160,15 @@ window.initLotteryRecord = function() {
       let options = optionLine ? optionLine.replace('選項,','').split(' | ') : [];
       let answerStart = lines.findIndex(l => l.startsWith('DC名稱,'));
       let answerRows = answerStart >= 0 ? lines.slice(answerStart+1) : [];
+      // 解析選項編號與文字
+      let optionMap = {};
+      options.forEach((opt, idx) => {
+        const label = String.fromCharCode(65 + idx); // A/B/C/D...
+        optionMap[label] = opt;
+      });
+      // 統計回答分布（根據回答內容 A/B/C/D）
       let counts = {};
-      options.forEach(opt => {
-        let label = opt.match(/^([A-Z])\./) ? opt.match(/^([A-Z])\./)[1] : opt;
+      Object.keys(optionMap).forEach(label => {
         counts[label] = 0;
       });
       answerRows.forEach(row => {
@@ -170,10 +176,46 @@ window.initLotteryRecord = function() {
         let ans = cols[2];
         if (counts.hasOwnProperty(ans)) counts[ans]++;
       });
-      const labels = Object.keys(counts);
-      const data = labels.map(l => counts[l]);
+      // 顯示選項文字與人數
+      const labels = Object.keys(optionMap).map(label => `${label}：${optionMap[label]}`);
+      const data = Object.keys(optionMap).map(label => counts[label]);
+      // 統計資訊
+      const totalParticipants = answerRows.length;
+      let winnerLine = lines.find(l => l.startsWith('抽獎人數,'));
+      let winnerCount = winnerLine ? winnerLine.split(',')[1] : '';
+      let answerLine = lines.find(l => l.startsWith('正確答案,'));
+      let correctAnswer = answerLine ? answerLine.split(',')[1].toUpperCase() : '';
+      let winners = [];
+      answerRows.forEach(row => {
+        let cols = row.split(',');
+        if (cols[2] === correctAnswer) winners.push({ name: cols[0], id: cols[1] });
+      });
+      let picked = winners.slice(0, Number(winnerCount));
+      // 解析檔名格式
+      const fileNameMatch = fileName.match(/^【([^】]+)】([^_]+)_(.+?)\.csv$/);
+      let displayTitle = fileName;
+      if (fileNameMatch) {
+        const date = fileNameMatch[1];
+        const title = fileNameMatch[2];
+        const time = fileNameMatch[3].replace(/-/g, ':');
+        displayTitle = `【${date}】${title} ${time}`;
+      }
+      // 開頭題目區塊
+      let headerHtml = `<div style='margin-bottom:10px;font-size:18px;font-weight:bold;'>${displayTitle}</div>
+        <div style='margin-bottom:14px;font-size:16px;'>預計抽出 <b>${winnerCount}</b> 位幸運兒獲得寶藏</div>`;
+      // 統計區塊 HTML
+      let statHtml = `<div style='margin-bottom:18px;font-size:17px;'>
+        參加人數：<b>${totalParticipants}</b><br>
+        答對人數：<b>${winners.length}</b><br>
+        實際抽出：<b>${picked.length}</b><br>
+        <div style='margin:8px 0;'>每個答案選擇人數：</div>
+        <ul style='margin-bottom:8px;'>${labels.map((l,i) => `<li>${l}：${data[i]}人</li>`).join('')}</ul>
+        <div style='margin:8px 0;'>中獎者：</div>
+        <ul>${picked.length ? picked.map(u => `<li>${u.name} (${u.id})</li>`).join('') : '<li>無</li>'}</ul>
+      </div>`;
       analysisArea.innerHTML = `<button class='back-btn' onclick='backToList()'>← 返回紀錄列表</button>
-        <div style='margin-bottom:18px;font-size:20px;font-weight:bold;'>${fileName}</div>
+        ${headerHtml}
+        ${statHtml}
         <div class='chart-container'><canvas id='answerChart'></canvas></div>`;
       new Chart(document.getElementById('answerChart'), {
         type: 'bar',

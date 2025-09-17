@@ -78,7 +78,7 @@ app.post('/api/start-lottery-event', async (req, res) => {
     if (!channel) throw new Error('Channel not found');
     const optionLabels = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
     const optionList = options.map((opt, idx) => `${optionLabels[idx]}. ${opt}`).join('\n');
-    const msg = `🗡️【冒險任務啟動】\n勇者啊！前方有一道試煉等你通過。\n題目：${question}\n\n選項：\n${optionList}\n\n⏳你有 ${countdown} 秒的時間作答，請輸入答案編號（A、B、C、D${options.length > 4 ? ' 或 ' + optionLabels[options.length-1] : ''}）來完成挑戰！\n成功答對者，將獲得神秘寶藏🎁！`;
+  const msg = `🗡️【冒險任務啟動】\n勇者啊！前方有一道試煉等你通過。\n題目：${question}\n\n選項：\n${optionList}\n\n⏳你有 ${countdown} 秒的時間作答，請輸入答案編號（A、B、C、D${options.length > 4 ? ' 或 ' + optionLabels[options.length-1] : ''}）來完成挑戰！\n預計抽出 ${winners} 位幸運兒獲得寶藏\n成功答對者，將獲得神秘寶藏🎁！`;
     await channel.send(msg);
     const startTime = Date.now();
     const endTime = startTime + countdown * 1000;
