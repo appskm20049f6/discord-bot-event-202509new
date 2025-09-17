@@ -43,13 +43,18 @@ document.getElementById('channelSearch').addEventListener('input', e => {
 // 單頁式分頁切換
 function loadPage(page) {
   document.querySelectorAll('.menu li').forEach(li => li.classList.remove('active'));
-  document.getElementById('menu-' + page).classList.add('active');
-  fetch('/dashboard/' + page + '.html')
+  if (document.getElementById('menu-' + page)) {
+    document.getElementById('menu-' + page).classList.add('active');
+  }
+  let pageFile = page;
+  if (page === 'record') pageFile = 'lottery-record';
+  fetch('/dashboard/' + pageFile + '.html')
     .then(res => res.text())
     .then(html => {
       document.getElementById('main-content').innerHTML = html;
       if (page === 'lottery') initLottery();
       if (page === 'vote') initVote();
+      // 活動紀錄頁載入 lottery-record.html 到主內容區，不跳轉整個頁面
     });
 }
 // 分頁 JS 集中於主頁

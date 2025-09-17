@@ -22,8 +22,7 @@
 <div class="lottery-container">
   <h2>抽獎管理</h2>
   <div style="margin-bottom:24px;">
-    <button id="tab-create" class="tab-btn active" onclick="showTab('create')">創建新活動</button>
-    <button id="tab-history" class="tab-btn" onclick="showTab('history')">活動紀錄</button>
+  <button id="tab-create" class="tab-btn active">創建新活動</button>
   </div>
 
   <!-- 建立活動 -->
@@ -61,36 +60,10 @@
   </div>
 
   <!-- 活動紀錄 -->
-  <div id="tab-history-content" style="display:none;">
-    <div id="lotteryList"></div>
-  </div>
+  <!-- 活動紀錄分頁已移至 lottery-record.html -->
 </div>
 <script>
-function showTab(tab) {
-  document.getElementById('tab-create').classList.remove('active');
-  document.getElementById('tab-history').classList.remove('active');
-  document.getElementById('tab-create-content').style.display = 'none';
-  document.getElementById('tab-history-content').style.display = 'none';
-  if (tab === 'create') {
-    document.getElementById('tab-create').classList.add('active');
-    document.getElementById('tab-create-content').style.display = '';
-  } else {
-    document.getElementById('tab-history').classList.add('active');
-    document.getElementById('tab-history-content').style.display = '';
-    loadLotteryList();
-  }
-}
-function loadLotteryList() {
-  fetch('/api/lottery')
-    .then(res => res.json())
-    .then(list => {
-      document.getElementById('lotteryList').innerHTML =
-        list.map(item => `<div>活動：${item.name}</div>`).join('');
-    })
-    .catch(err => {
-      document.getElementById('lotteryList').innerHTML = `⚠️ 載入失敗：${err.message}`;
-    });
-}
+// 活動紀錄分頁已移至 lottery-record.html
 function submitLottery() {
   const title = document.getElementById('lotteryTitle').value;
   const answer = document.getElementById('lotteryAnswer').value;
