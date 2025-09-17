@@ -1,262 +1,84 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
+<!DOCTYPE html>
+<html lang="zh-TW">
 <head>
   <meta charset="UTF-8">
-  <title>Discord Bot Dashboard</title>
+  <title>Discord Bot 後台管理</title>
   <style>
-    body { font-family: Arial, sans-serif; background: #f4f4f4; }
-    .container { max-width: 600px; margin: 40px auto; background: #fff; padding: 24px; border-radius: 8px; box-shadow: 0 2px 8px #ccc; }
-    h1 { text-align: center; }
-    .category { margin: 16px 0; }
-    button { padding: 8px 16px; margin: 8px; border-radius: 4px; border: none; background: #007bff; color: #fff; cursor: pointer; }
-    button:hover { background: #0056b3; }
+    body { margin:0; font-family: Arial, sans-serif; background: #f4f4f4; }
+    .container { display: flex; height: 100vh; }
+    .sidebar { width: 240px; background: #222; color: #fff; padding-top: 32px; }
+    .sidebar h3 { text-align:center; margin-bottom:24px; }
+    .card-select {
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: 0 4px 16px #0003;
+      padding: 24px 20px 20px 20px;
+      margin: 0 20px 32px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      align-items: stretch;
+    }
+    .select-group { margin-bottom: 0; display: flex; flex-direction: column; gap: 8px; }
+    .select-group label {
+      font-weight: bold;
+      color: #333;
+      font-size: 15px;
+      margin-bottom: 0;
+    }
+    .select-box, #channelSearch {
+      width: 100%;
+      padding: 10px 14px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      font-size: 16px;
+      background: #f8f8f8;
+      margin-bottom: 0;
+      transition: border-color 0.2s;
+      box-sizing: border-box;
+    }
+    .select-box:focus, #channelSearch:focus {
+      border-color: #007bff;
+      outline: none;
+    }
+    .sidebar .menu { list-style:none; padding:0; }
+    .sidebar .menu li { padding:16px 24px; cursor:pointer; }
+    .sidebar .menu li.active, .sidebar .menu li:hover { background:#007bff; color:#fff; }
+    .main { flex:1; background:#fff; padding:32px; overflow:auto; }
   </style>
 </head>
 <body>
-  <div style="background: #fff; padding: 40px; border-radius: 16px; width: 600px; margin: 60px auto; box-shadow: 0 2px 8px #0001;">
-    <div style="display:flex; gap:16px; margin-bottom:32px;">
-      <button id="tabLottery" style="flex:1; background:#2196f3; color:#fff; border:none; padding:12px 0; border-radius:8px; font-size:1.2em; cursor:pointer;">抽獎活動</button>
-      <button id="tabOther" style="flex:1; background:#eee; color:#888; border:none; padding:12px 0; border-radius:8px; font-size:1.2em; cursor:pointer;" disabled>其他分頁</button>
+  <div class="container">
+    <div class="sidebar">
+      <div class="card-select">
+        <div class="select-group">
+          <label for="guilds">選擇DC伺服器</label>
+          <select id="guilds" class="select-box"></select>
+        </div>
+        <div class="select-group">
+          <label for="channels">選擇發布頻道</label>
+          <input id="channelSearch" class="select-box" type="text" placeholder="搜尋頻道名稱..." style="margin-bottom:8px;" />
+          <select id="channels" class="select-box"></select>
+        </div>
+      </div>
+      <h3>管理工具</h3>
+      <ul class="menu">
+        <li id="menu-lottery" class="active" onclick="loadPage('lottery')">抽獎</li>
+      </ul>
     </div>
-    <div id="lotteryTab">
-      <h2 style="text-align:center; margin-bottom:24px;">抽獎活動設定</h2>
-      <form id="lotteryForm" style="display:flex; flex-direction:column; gap:18px;">
-        <div>
-          <label><b>題目：</b></label><br>
-          <input type="text" id="lotteryQuestion" style="width:100%; padding:8px; border-radius:6px; border:1px solid #ccc;" required>
-        </div>
-        <div>
-          <label><b>選項：</b></label><br>
-          <div id="optionList"></div>
-          <button type="button" id="addOptionBtn" style="margin-top:8px; background:#eee; color:#2196f3; border:none; padding:6px 18px; border-radius:6px; font-size:1em; cursor:pointer;">新增選項</button>
-          <div style="font-size:0.95em; color:#888; margin-top:4px;">送出後會自動編號為 A、B、C...，參加者只需回答編號（如 B）即可。</div>
-        </div>
-        <div>
-          <label><b>正確答案編號（如 A、B、C）：</b></label><br>
-          <input type="text" id="lotteryAnswer" placeholder="B" style="width:100%; padding:8px; border-radius:6px; border:1px solid #ccc; text-transform:uppercase;" required maxlength="1">
-        </div>
-        <div>
-          <label><b>倒數時間（秒）：</b></label><br>
-          <input type="number" id="lotteryCountdown" min="10" max="600" value="60" style="width:100%; padding:8px; border-radius:6px; border:1px solid #ccc;" required>
-        </div>
-        <div>
-          <label><b>抽出人數：</b></label><br>
-          <input type="number" id="lotteryWinners" min="1" max="20" value="1" style="width:100%; padding:8px; border-radius:6px; border:1px solid #ccc;" required>
-        </div>
-        <div>
-          <label><b>選擇頻道：</b></label><br>
-          <input id="channelSearch" type="text" placeholder="搜尋頻道名稱..." style="width:100%; padding:8px; border-radius:6px; border:1px solid #ccc; margin-bottom:6px;" />
-          <select id="channels" style="width:100%; padding:8px; border-radius:6px; border:1px solid #ccc;"></select>
-        </div>
-        <div style="text-align:center; margin-top:12px;">
-          <button type="submit" style="background:#ff4081; color:#fff; border:none; padding:10px 32px; border-radius:6px; font-size:1.1em; cursor:pointer;">送出抽獎活動</button>
-        </div>
-      </form>
-      <div id="lotteryEventResult" style="background:#fff3e0; color:#d84315; border-radius:8px; padding:16px; margin-top:24px; display:none; font-size:1.1em;"></div>
+    <div class="main" id="main-content">
+      <!-- AJAX 載入內容 -->
     </div>
   </div>
   <script>
-    // 分頁切換（僅顯示抽獎活動）
-    document.getElementById('tabLottery').onclick = function() {
-      document.getElementById('lotteryTab').style.display = 'block';
-      this.style.background = '#2196f3';
-      this.style.color = '#fff';
-      document.getElementById('tabOther').style.background = '#eee';
-      document.getElementById('tabOther').style.color = '#888';
-    }
-    document.getElementById('tabOther').onclick = function() {
-      // 其他分頁功能預留
-    }
-
-    // 取得頻道列表（假設已選定伺服器）
-    let allChannels = [];
-    fetch('http://localhost:3030/api/guilds')
-      .then(res => res.json())
-      .then(guilds => {
-        if(guilds.length) {
-          fetch(`http://localhost:3030/api/guilds/${guilds[0].id}/channels`)
-            .then(res => res.json())
-            .then(channels => {
-              allChannels = channels;
-              renderChannelOptions('');
-            });
-        }
-      });
-
-    // 搜尋式下拉選單
-    function renderChannelOptions(keyword) {
-      const chSel = document.getElementById('channels');
-      chSel.innerHTML = '';
-      const filtered = allChannels.filter(ch => ch.name.toLowerCase().includes(keyword.toLowerCase()));
-      filtered.forEach(ch => {
-        const opt = document.createElement('option');
-        opt.value = ch.id;
-        opt.textContent = ch.name;
-        chSel.appendChild(opt);
-      });
-    }
-    document.getElementById('channelSearch').addEventListener('input', e => {
-      renderChannelOptions(e.target.value);
-    });
-
-    // 抽獎活動送出
-    // 動態選項方塊互動
-    const optionLabels = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
-    const optionListDiv = document.getElementById('optionList');
-    const addOptionBtn = document.getElementById('addOptionBtn');
-    function renderOptions() {
-      const optionInputs = Array.from(optionListDiv.querySelectorAll('.option-input'));
-      optionInputs.forEach((input, idx) => {
-        input.previousElementSibling.textContent = optionLabels[idx];
-      });
-    }
-    function addOption(value = '') {
-      const idx = optionListDiv.children.length;
-      const wrapper = document.createElement('div');
-      wrapper.style.display = 'flex';
-      wrapper.style.alignItems = 'center';
-      wrapper.style.marginBottom = '6px';
-      const label = document.createElement('span');
-      label.textContent = optionLabels[idx];
-      label.style.fontWeight = 'bold';
-      label.style.marginRight = '8px';
-      const input = document.createElement('input');
-      input.type = 'text';
-      input.className = 'option-input';
-      input.value = value;
-      input.style.flex = '1';
-      input.style.padding = '6px';
-      input.style.borderRadius = '6px';
-      input.style.border = '1px solid #ccc';
-      input.required = true;
-      const delBtn = document.createElement('button');
-      delBtn.type = 'button';
-      delBtn.textContent = '刪除';
-      delBtn.style.marginLeft = '8px';
-      delBtn.style.background = '#eee';
-      delBtn.style.color = '#d84315';
-      delBtn.style.border = 'none';
-      delBtn.style.borderRadius = '6px';
-      delBtn.style.cursor = 'pointer';
-      delBtn.onclick = () => {
-        optionListDiv.removeChild(wrapper);
-        renderOptions();
-      };
-      wrapper.appendChild(label);
-      wrapper.appendChild(input);
-      if (optionListDiv.children.length > 1) wrapper.appendChild(delBtn);
-      optionListDiv.appendChild(wrapper);
-      renderOptions();
-    }
-    addOption();
-    addOption();
-    addOption();
-    addOptionBtn.onclick = () => addOption();
-
-    document.getElementById('lotteryForm').onsubmit = function(e) {
-      e.preventDefault();
-      const optionInputs = Array.from(optionListDiv.querySelectorAll('.option-input'));
-      const options = optionInputs.map(input => input.value.trim()).filter(Boolean);
-      if (options.length < 2) {
-        alert('請至少輸入兩個選項');
-        return;
-      }
-      // 正確答案編號
-      const answer = document.getElementById('lotteryAnswer').value.trim().toUpperCase();
-      const data = {
-        question: document.getElementById('lotteryQuestion').value,
-        options,
-        answer,
-        countdown: Number(document.getElementById('lotteryCountdown').value),
-        winners: Number(document.getElementById('lotteryWinners').value),
-        channelId: document.getElementById('channels').value,
-        optionLabels: optionLabels.slice(0, options.length)
-      };
-      fetch('http://localhost:3030/api/start-lottery-event', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
-      })
-      .then(res => res.json())
-      .then(result => {
-        const resultDiv = document.getElementById('lotteryEventResult');
-        if(result.success) {
-          resultDiv.style.display = 'block';
-          resultDiv.textContent = '抽獎活動已成功啟動，請至指定頻道查看！';
-        } else {
-          resultDiv.style.display = 'block';
-          resultDiv.textContent = '抽獎活動啟動失敗：' + (result.error || '未知錯誤');
-        }
-      })
-      .catch(() => {
-        const resultDiv = document.getElementById('lotteryEventResult');
-        resultDiv.style.display = 'block';
-        resultDiv.textContent = '抽獎活動 API 發生錯誤。';
-      });
-    }
-    // 抽獎功能
-    document.getElementById('lotteryBtn').onclick = function() {
-      const guildId = document.getElementById('guilds').value;
-      const channelId = document.getElementById('channels').value;
-      fetch('http://localhost:3030/api/lottery', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ guildId, channelId })
-      })
-      .then(res => res.json())
-      .then(result => {
-        const resultDiv = document.getElementById('lotteryResult');
-        if(result.success && result.winner) {
-          resultDiv.style.display = 'block';
-          resultDiv.textContent = `🎉 恭喜 ${result.winner.name} (${result.winner.id}) 中獎！`;
-        } else {
-          resultDiv.style.display = 'block';
-          resultDiv.textContent = '目前沒有可抽獎的用戶或抽獎失敗。';
-        }
-      })
-      .catch(() => {
-        const resultDiv = document.getElementById('lotteryResult');
-        resultDiv.style.display = 'block';
-        resultDiv.textContent = '抽獎 API 發生錯誤。';
-      });
-    }
-    // Chart.js 圖表
-    window.onload = function() {
-      const ctx = document.getElementById('activityChart').getContext('2d');
-      new Chart(ctx, {
-        type: 'line',
-        data: {
-          labels: ['7/10', '7/11', '7/12', '7/13', '7/14', '7/15', '7/16', '7/17', '7/18', '7/19', '7/20'],
-          datasets: [{
-            label: '訊息數',
-            data: [20, 17, 23, 19, 25, 30, 22, 27, 24, 29, 26],
-            borderColor: '#2196f3',
-            backgroundColor: 'rgba(33,150,243,0.1)',
-            fill: true,
-            tension: 0.3
-          }]
-        },
-        options: {
-          responsive: true,
-          plugins: {
-            legend: { display: false }
-          },
-          scales: {
-            y: { beginAtZero: true }
-          }
-        }
-      });
-    }
-  
-    // 載入 Chart.js CDN
-    var script = document.createElement('script');
-    script.src = 'https://cdn.jsdelivr.net/npm/chart.js';
-    document.head.appendChild(script);
-    // 取得伺服器列表
+    // 載入伺服器選單
     fetch('http://localhost:3030/api/guilds')
       .then(res => res.json())
       .then(guilds => {
         const guildSel = document.getElementById('guilds');
+        guildSel.innerHTML = '';
         guilds.forEach(g => {
           const opt = document.createElement('option');
           opt.value = g.id;
@@ -270,36 +92,46 @@
       loadChannels(e.target.value);
     };
 
+    // 載入頻道選單
+    let allChannels = [];
     function loadChannels(guildId) {
       fetch(`http://localhost:3030/api/guilds/${guildId}/channels`)
         .then(res => res.json())
         .then(channels => {
-          const chSel = document.getElementById('channels');
-          chSel.innerHTML = '';
-          channels.forEach(ch => {
-            const opt = document.createElement('option');
-            opt.value = ch.id;
-            opt.textContent = ch.name;
-            chSel.appendChild(opt);
-          });
+          allChannels = channels;
+          renderChannelOptions('');
         });
     }
 
-    function sendMsg() {
-      const guildId = document.getElementById('guilds').value;
-      const channelId = document.getElementById('channels').value;
-      const content = document.getElementById('msg').value;
-      fetch('http://localhost:3030/api/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ guildId, channelId, content })
-      })
-      .then(res => res.json())
-      .then(result => {
-        if(result.success) alert('訊息已發送！');
-        else alert('發送失敗: ' + result.error);
+    // 搜尋式頻道選單
+    function renderChannelOptions(keyword) {
+      const chSel = document.getElementById('channels');
+      chSel.innerHTML = '';
+      const filtered = allChannels.filter(ch => ch.name.toLowerCase().includes(keyword.toLowerCase()));
+      filtered.forEach(ch => {
+        const opt = document.createElement('option');
+        opt.value = ch.id;
+        opt.textContent = ch.name;
+        chSel.appendChild(opt);
       });
     }
+
+    document.getElementById('channelSearch').addEventListener('input', e => {
+      renderChannelOptions(e.target.value);
+    });
+
+    // 工具頁 AJAX 載入
+    function loadPage(page) {
+      document.querySelectorAll('.menu li').forEach(li => li.classList.remove('active'));
+      document.getElementById('menu-' + page).classList.add('active');
+      fetch(page + '.html')
+        .then(res => res.text())
+        .then(html => {
+          document.getElementById('main-content').innerHTML = html;
+        });
+    }
+    loadPage('lottery');
   </script>
 </body>
 </html>
+       
