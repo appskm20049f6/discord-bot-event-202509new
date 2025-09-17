@@ -4,6 +4,9 @@ import dotenv from 'dotenv';
 import express from 'express';
 import cors from 'cors';
 import open from 'open';
+import ExcelJS from 'exceljs';
+import fs from 'fs';
+import path from 'path';
 dotenv.config();
 
 const client = new Client({
@@ -83,9 +86,9 @@ app.post('/api/start-lottery-event', async (req, res) => {
         let fetched = [];
         let lastId;
         while (true) {
-          const options = { limit: 100 };
-          if (lastId) options.before = lastId;
-          const messages = await channel.messages.fetch(options);
+          const fetchOptions = { limit: 100 };
+          if (lastId) fetchOptions.before = lastId;
+          const messages = await channel.messages.fetch(fetchOptions);
           const msgs = Array.from(messages.values()).filter(msg =>
             msg.createdTimestamp >= startTime && msg.createdTimestamp <= endTime && !msg.author.bot
           );
@@ -93,22 +96,22 @@ app.post('/api/start-lottery-event', async (req, res) => {
           if (messages.size < 100) break;
           lastId = messages.last().id;
         }
-        const userSet = new Set();
-        const answerStats = {};
-        const optionLabels = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
-        optionLabels.slice(0, options.length).forEach(label => {
-          answerStats[label] = 0;
-        });
+        // 收集有效回答（只保留第一次）
+        const validLabels = optionLabels.slice(0, options.length);
+        const userAnswers = {};
         fetched.forEach(msg => {
           const ans = msg.content.trim().toUpperCase();
-          if (answerStats.hasOwnProperty(ans)) {
-            answerStats[ans]++;
+          if (validLabels.includes(ans) && !userAnswers[msg.author.id]) {
+            userAnswers[msg.author.id] = {
+              name: msg.author.username,
+              id: msg.author.id,
+              answer: ans,
+              time: new Date(msg.createdTimestamp).toISOString()
+            };
           }
-          userSet.add(msg.author.id);
         });
-        const correctUsers = Array.from(new Set(
-          fetched.filter(msg => msg.content.trim().toUpperCase() === answer.toUpperCase()).map(msg => msg.author.id)
-        ));
+        // 統計答對者
+        const correctUsers = Object.values(userAnswers).filter(u => u.answer === answer.toUpperCase()).map(u => u.id);
         let resultMsg = '';
         if (correctUsers.length === 0) {
           resultMsg = '可惜啦～這次沒有勇者解開謎題。\n寶藏依然沉睡，等待下一位冒險者來挑戰……';
@@ -118,6 +121,22 @@ app.post('/api/start-lottery-event', async (req, res) => {
           resultMsg = `恭喜勇者成功解開謎題，獲得神秘寶藏🎁：\n` + winnersList.map(u => `<@${u}>`).join('\n');
         }
         await channel.send(`⌛【任務結束】\n${resultMsg}`);
+
+        // ====== 寫入 Excel 檔案 ======
+        const workbook = new ExcelJS.Workbook();
+        const sheet = workbook.addWorksheet('抽獎紀錄');
+        sheet.addRow(['題目', question]);
+        sheet.addRow(['選項', options.join(' | ')]);
+        sheet.addRow(['正確答案', answer]);
+        sheet.addRow(['抽獎人數', winners]);
+        sheet.addRow([]);
+        sheet.addRow(['DC名稱', 'ID', '回答內容', '回答時間']);
+        Object.values(userAnswers).forEach(u => {
+          sheet.addRow([u.name, u.id, u.answer, u.time]);
+        });
+        const fileName = `lottery_${new Date(startTime).toISOString().replace(/[:.]/g,'-')}.xlsx`;
+        const filePath = path.join('data', fileName);
+        await workbook.xlsx.writeFile(filePath);
       } catch (err) {
         await channel.send('抽獎活動結束，但回溯訊息時發生錯誤。');
       }
