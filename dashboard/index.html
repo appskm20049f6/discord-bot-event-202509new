@@ -1,71 +1,65 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
-<!DOCTYPE html>
-<html lang="zh-TW">
 <head>
   <meta charset="UTF-8">
   <title>Discord Bot 後台管理</title>
   <style>
     body { margin:0; font-family: Arial, sans-serif; background: #f4f4f4; }
     .container { display: flex; height: 100vh; }
-    .sidebar { width: 240px; background: #222; color: #fff; padding-top: 32px; }
-    .sidebar h3 { text-align:center; margin-bottom:24px; }
+    .sidebar { width: 270px; background: #222; color: #fff; padding-top: 40px; border-radius: 24px; box-shadow: 0 6px 24px #0002; margin: 24px 0 24px 24px; display: flex; flex-direction: column; align-items: stretch; }
+    .sidebar h3 { text-align:center; margin-bottom:32px; font-size:20px; letter-spacing:2px; }
     .card-select {
       background: #fff;
-      border-radius: 16px;
+      border-radius: 18px;
       box-shadow: 0 4px 16px #0003;
-      padding: 24px 20px 20px 20px;
-      margin: 0 20px 32px 20px;
+      padding: 28px 18px 24px 18px;
+      margin: 0 0 32px 0;
       display: flex;
       flex-direction: column;
-      gap: 18px;
+      gap: 22px;
       align-items: stretch;
-    }
-    .select-group { margin-bottom: 0; display: flex; flex-direction: column; gap: 8px; }
-    .select-group label {
-      font-weight: bold;
-      color: #333;
-      font-size: 15px;
-      margin-bottom: 0;
-    }
-    .select-box, #channelSearch {
-      width: 100%;
-      padding: 10px 14px;
-      border-radius: 8px;
-      border: 1px solid #ccc;
-      font-size: 16px;
-      background: #f8f8f8;
-      margin-bottom: 0;
-      transition: border-color 0.2s;
       box-sizing: border-box;
     }
-    .select-box:focus, #channelSearch:focus {
-      border-color: #007bff;
-      outline: none;
+    .select-group { display: flex; flex-direction: column; gap: 10px; }
+    .select-group label { font-weight: bold; color: #333; font-size: 16px; }
+    .select-box, #channelSearch {
+      width: 100%;
+      min-width: 0;
+      max-width: 100%;
+      padding: 12px 16px;
+      border-radius: 10px;
+      border: 1px solid #ccc;
+      font-size: 17px;
+      background: #f8f8f8;
+      box-sizing: border-box;
+      margin: 0;
+      display: block;
     }
-    .sidebar .menu { list-style:none; padding:0; }
-    .sidebar .menu li { padding:16px 24px; cursor:pointer; }
+    .select-box:focus, #channelSearch:focus { border-color: #007bff; outline: none; }
+    .sidebar .menu { list-style:none; padding:0; margin-top:24px; }
+    .sidebar .menu li { padding:18px 28px; cursor:pointer; font-size:17px; border-radius:8px; margin-bottom:8px; transition:background 0.2s; }
     .sidebar .menu li.active, .sidebar .menu li:hover { background:#007bff; color:#fff; }
-    .main { flex:1; background:#fff; padding:32px; overflow:auto; }
+    .main { flex:1; background:#fff; padding:48px 64px; overflow:auto; border-radius:24px; margin:24px; box-shadow:0 6px 24px #0001; min-width:400px; }
   </style>
 </head>
 <body>
   <div class="container">
     <div class="sidebar">
-      <div class="card-select">
-        <div class="select-group">
+      <div class="card-select" style="min-width:200px;max-width:220px;margin:0 auto 32px auto;">
+        <div class="select-group" style="margin-bottom:12px;">
           <label for="guilds">選擇DC伺服器</label>
-          <select id="guilds" class="select-box"></select>
+          <select id="guilds" class="select-box" style="min-width:100%;font-size:16px;"></select>
         </div>
-        <div class="select-group">
+        <div class="select-group" style="margin-bottom:12px;">
           <label for="channels">選擇發布頻道</label>
-          <input id="channelSearch" class="select-box" type="text" placeholder="搜尋頻道名稱..." style="margin-bottom:8px;" />
-          <select id="channels" class="select-box"></select>
+          <input id="channelSearch" class="select-box" type="text" placeholder="搜尋頻道名稱..." style="margin-bottom:8px;min-width:100%;font-size:16px;" />
+          <select id="channels" class="select-box" style="min-width:100%;font-size:16px;"></select>
         </div>
       </div>
       <h3>管理工具</h3>
       <ul class="menu">
         <li id="menu-lottery" class="active" onclick="loadPage('lottery')">抽獎</li>
+        <li id="menu-vote" onclick="loadPage('vote')">投票</li>
       </ul>
     </div>
     <div class="main" id="main-content">
@@ -74,7 +68,7 @@
   </div>
   <script>
     // 載入伺服器選單
-    fetch('http://localhost:3030/api/guilds')
+    fetch('/api/guilds')
       .then(res => res.json())
       .then(guilds => {
         const guildSel = document.getElementById('guilds');
@@ -95,7 +89,7 @@
     // 載入頻道選單
     let allChannels = [];
     function loadChannels(guildId) {
-      fetch(`http://localhost:3030/api/guilds/${guildId}/channels`)
+      fetch(`/api/guilds/${guildId}/channels`)
         .then(res => res.json())
         .then(channels => {
           allChannels = channels;
@@ -124,7 +118,7 @@
     function loadPage(page) {
       document.querySelectorAll('.menu li').forEach(li => li.classList.remove('active'));
       document.getElementById('menu-' + page).classList.add('active');
-      fetch(page + '.html')
+      fetch('/dashboard/' + page + '.html')
         .then(res => res.text())
         .then(html => {
           document.getElementById('main-content').innerHTML = html;
@@ -134,4 +128,3 @@
   </script>
 </body>
 </html>
-       

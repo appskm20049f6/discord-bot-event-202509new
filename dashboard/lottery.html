@@ -1,6 +1,142 @@
 <div style="padding:24px;">
   <h2>抽獎管理</h2>
-  <button id="lotteryBtn">新建活動</button>
-  <div id="lotteryList"></div>
+  <div style="margin-bottom:24px;">
+    <button id="tab-create" class="tab-btn active" onclick="showTab('create')">創建新活動</button>
+    <button id="tab-history" class="tab-btn" onclick="showTab('history')">活動紀錄</button>
+  </div>
+
+  <!-- 建立活動 -->
+  <div id="tab-create-content">
+    <form id="lotteryForm" style="max-width:400px;">
+      <div style="margin-bottom:16px;">
+        <label>題目：</label>
+        <input type="text" id="lotteryTitle" class="select-box" placeholder="請輸入抽獎題目" required />
+      </div>
+      <div style="margin-bottom:16px;">
+        <label>選項：</label>
+        <div id="optionList"></div>
+
+      </div>
+      <div style="margin-bottom:16px;">
+        <label>設定答案：</label>
+        <input type="text" id="lotteryAnswer" class="select-box" placeholder="請輸入正確答案 (如 A、B)" required />
+      </div>
+      <div style="margin-bottom:16px;">
+        <label>設定回答時間（秒）：</label>
+        <input type="number" id="lotteryTime" class="select-box" min="1" value="30" required />
+      </div>
+      <div style="margin-bottom:16px;">
+        <label>設定抽獎人數：</label>
+        <input type="number" id="lotteryWinnerCount" class="select-box" min="1" value="1" required />
+      </div>
+      <button type="submit" class="select-box" style="background:#007bff;color:#fff;font-weight:bold;">發布</button>
+    </form>
+    <div id="lotteryCreateResult" style="margin-top:16px;"></div>
+  </div>
+
+  <!-- 活動紀錄 -->
+  <div id="tab-history-content" style="display:none;">
+    <div id="lotteryList"></div>
+  </div>
 </div>
-<script src="lottery.js"></script>
+<script>
+// lottery.js 內容直接嵌入
+let optionCount = 2;
+const optionLabels = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+const optionList = document.getElementById('optionList');
+function renderOptions() {
+  optionList.innerHTML = '';
+  for (let i = 0; i < optionCount; i++) {
+    const wrapper = document.createElement('div');
+    wrapper.style.display = 'flex';
+    wrapper.style.alignItems = 'center';
+    const label = document.createElement('span');
+    label.textContent = optionLabels[i] + ':';
+    label.style.fontWeight = 'bold';
+    label.style.marginRight = '8px';
+    wrapper.appendChild(label);
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'select-box';
+    input.placeholder = `請輸入選項內容`;
+    input.required = true;
+    input.name = `option${i + 1}`;
+    input.style.flex = '1';
+    input.oninput = () => {
+      if (i === optionCount - 1 && optionCount < 4 && input.value.trim() !== '') {
+        optionCount++;
+        renderOptions();
+      }
+    };
+    wrapper.appendChild(input);
+    optionList.appendChild(wrapper);
+  }
+}
+function loadLotteryList() {
+  fetch('/api/lottery')
+    .then(res => res.json())
+    .then(list => {
+      document.getElementById('lotteryList').innerHTML =
+        list.map(item => `<div>活動：${item.name}</div>`).join('');
+    })
+    .catch(err => {
+      document.getElementById('lotteryList').innerHTML = `⚠️ 載入失敗：${err.message}`;
+    });
+}
+function showTab(tab) {
+  document.getElementById('tab-create').classList.remove('active');
+  document.getElementById('tab-history').classList.remove('active');
+  document.getElementById('tab-create-content').style.display = 'none';
+  document.getElementById('tab-history-content').style.display = 'none';
+  if (tab === 'create') {
+    document.getElementById('tab-create').classList.add('active');
+    document.getElementById('tab-create-content').style.display = '';
+  } else {
+    document.getElementById('tab-history').classList.add('active');
+    document.getElementById('tab-history-content').style.display = '';
+    loadLotteryList();
+  }
+}
+document.getElementById('lotteryForm').onsubmit = async function (e) {
+  e.preventDefault();
+  const title = document.getElementById('lotteryTitle').value;
+  const answer = document.getElementById('lotteryAnswer').value;
+  const time = document.getElementById('lotteryTime').value;
+  const winnerCount = document.getElementById('lotteryWinnerCount').value;
+  const options = Array.from(optionList.querySelectorAll('input')).map(i => i.value).filter(Boolean);
+  const channelId = window.parent && window.parent.document
+    ? window.parent.document.getElementById('channels')?.value
+    : (document.getElementById('channels') ? document.getElementById('channels').value : null);
+  if (!channelId) {
+    document.getElementById('lotteryCreateResult').textContent = '⚠️ 請先選擇發布頻道';
+    return;
+  }
+  try {
+    const res = await fetch('/api/start-lottery-event', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        question: title,
+        options,
+        answer,
+        countdown: Number(time),
+        winners: Number(winnerCount),
+        channelId
+      })
+    });
+    const result = await res.json();
+    if (result.success) {
+      document.getElementById('lotteryCreateResult').textContent = '✅ 抽獎活動已發布！';
+      document.getElementById('lotteryForm').reset();
+      optionCount = 2;
+      renderOptions();
+      loadLotteryList();
+    } else {
+      document.getElementById('lotteryCreateResult').textContent = '❌ 發布失敗：' + (result.error || '未知錯誤');
+    }
+  } catch (err) {
+    document.getElementById('lotteryCreateResult').textContent = '❌ 發布失敗：' + err.message;
+  }
+};
+renderOptions();
+</script>
