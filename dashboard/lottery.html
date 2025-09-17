@@ -1,17 +1,6 @@
 <div style="padding:24px;">
   <h2>抽獎管理</h2>
-  <button onclick="createLottery()">新建活動</button>
+  <button id="lotteryBtn">新建活動</button>
   <div id="lotteryList"></div>
 </div>
-<script>
-function createLottery() {
-  alert('這裡可以彈出新建抽獎活動的表單');
-}
-// AJAX 取得抽獎活動列表（範例）
-fetch('/api/lottery')
-  .then(res => res.json())
-  .then(list => {
-    document.getElementById('lotteryList').innerHTML =
-      list.map(item => `<div>活動：${item.name}</div>`).join('');
-  });
-</script>
+<script src="lottery.js"></script>
