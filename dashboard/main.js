@@ -24,7 +24,18 @@ function loadChannels(guildId) {
   fetch(`/api/guilds/${guildId}/channels`)
     .then(res => res.json())
     .then(channels => {
-      allChannels = channels;
+      // 前端過濾掉沒有歷史訊息讀取與發送權限的頻道
+      allChannels = channels.filter(ch => {
+        // 權限位元運算：READ_MESSAGE_HISTORY=0x00000040, SEND_MESSAGES=0x00000800
+        // API 可回傳 ch.permissions (如有)
+        if (typeof ch.permissions === 'number') {
+          const canRead = (ch.permissions & 0x00000040) !== 0;
+          const canSend = (ch.permissions & 0x00000800) !== 0;
+          return canRead && canSend;
+        }
+        // 若沒權限資訊，預設顯示
+        return true;
+      });
       renderChannelOptions('');
     });
 }
@@ -33,16 +44,44 @@ function renderChannelOptions(keyword) {
   const chSel = document.getElementById('channels');
   chSel.innerHTML = '';
   const filtered = allChannels.filter(ch => ch.name.toLowerCase().includes(keyword.toLowerCase()));
-  filtered.forEach(ch => {
-    const opt = document.createElement('option');
-    opt.value = ch.id;
-    opt.textContent = ch.name;
-    chSel.appendChild(opt);
+  // 依 categoryName 分組，並依 position 排序
+  // 先取得所有分類與未分類的順序
+  const allSorted = allChannels.slice().sort((a, b) => {
+    // 先比 category position，再比 channel position
+    if (a.categoryId !== b.categoryId) {
+      // 未分類排最前
+      if (!a.categoryId) return -1;
+      if (!b.categoryId) return 1;
+      // 依 categoryPosition
+      return (a.categoryPosition ?? 0) - (b.categoryPosition ?? 0);
+    }
+    // 同分類下依 channelPosition
+    return (a.channelPosition ?? 0) - (b.channelPosition ?? 0);
+  });
+  // 依排序後的順序分組
+  const groupMap = {};
+  allSorted.forEach(ch => {
+    if (!ch.name.toLowerCase().includes(keyword.toLowerCase())) return;
+    const cat = ch.categoryName || '未分類';
+    if (!groupMap[cat]) groupMap[cat] = [];
+    groupMap[cat].push(ch);
+  });
+  Object.keys(groupMap).forEach(cat => {
+    const optgroup = document.createElement('optgroup');
+    optgroup.label = cat;
+    groupMap[cat].forEach(ch => {
+      const opt = document.createElement('option');
+      opt.value = ch.id;
+      opt.textContent = ch.name;
+      optgroup.appendChild(opt);
+    });
+    chSel.appendChild(optgroup);
   });
   // 自動選第一個並更新 localStorage.channelId
-  if (filtered.length) {
-    chSel.value = filtered[0].id;
-    localStorage.channelId = filtered[0].id;
+  const first = filtered[0];
+  if (first) {
+    chSel.value = first.id;
+    localStorage.channelId = first.id;
   } else {
     localStorage.channelId = '';
   }

@@ -51,10 +51,50 @@ app.get('/api/guilds/:guildId/channels', (req, res) => {
   const guild = client.guilds.cache.get(req.params.guildId);
   if (!guild) return res.status(404).json({ error: 'Guild not found' });
 
-  const channels = guild.channels.cache
-    .filter(ch => ch.type === ChannelType.GuildText)
-    .map(ch => ({ id: ch.id, name: ch.name }));
-
+  // 取得所有主文字頻道
+  const botMember = guild.members.me;
+  const textChannels = guild.channels.cache.filter(ch => ch.type === ChannelType.GuildText);
+  // 取得所有分類
+  const categories = guild.channels.cache.filter(ch => ch.type === ChannelType.GuildCategory);
+  // 取得分類順序
+  const categoryOrder = {};
+  categories.forEach(cat => { categoryOrder[cat.id] = cat.rawPosition ?? cat.position ?? 0; });
+  // 取得所有 thread（公開/私密/active）
+  let threads = [];
+  textChannels.forEach(ch => {
+    if (ch.threads && ch.threads.cache.size) {
+      ch.threads.cache.forEach(thread => {
+        let permissions = 0n;
+        if (botMember) permissions = thread.permissionsFor(botMember)?.bitfield ?? 0n;
+        threads.push({
+          id: thread.id.toString(),
+          name: `#${ch.name} / ${thread.name}`,
+          permissions: permissions.toString(),
+          categoryId: ch.parentId ? ch.parentId.toString() : '',
+          categoryName: ch.parentId ? (categories.get(ch.parentId)?.name || '') : '',
+          categoryPosition: ch.parentId ? (categoryOrder[ch.parentId] ?? 0) : 0,
+          channelPosition: thread.rawPosition ?? thread.position ?? 0
+        });
+      });
+    }
+  });
+  // 合併主頻道與 thread
+  const channels = [
+    ...textChannels.map(ch => {
+      let permissions = 0n;
+      if (botMember) permissions = ch.permissionsFor(botMember)?.bitfield ?? 0n;
+      return {
+        id: ch.id.toString(),
+        name: ch.name,
+        permissions: permissions.toString(),
+        categoryId: ch.parentId ? ch.parentId.toString() : '',
+        categoryName: ch.parentId ? (categories.get(ch.parentId)?.name || '') : '',
+        categoryPosition: ch.parentId ? (categoryOrder[ch.parentId] ?? 0) : 0,
+        channelPosition: ch.rawPosition ?? ch.position ?? 0
+      };
+    }),
+    ...threads
+  ];
   res.json(channels);
 });
 
