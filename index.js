@@ -335,7 +335,7 @@ app.get('/api/analyze-channel-messages', async (req, res) => {
     let fetched = [];
     let lastId;
     let loops = 0;
-    const MAX_FETCH = 5000;
+  const MAX_FETCH = 15000;
 
     while (true) {
       loops++;
