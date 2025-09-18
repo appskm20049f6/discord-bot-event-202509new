@@ -58,6 +58,59 @@
       <p>請從左側選單選擇功能分頁。</p>
     </div>
   </div>
+  <!-- Discord Token 輸入彈窗 -->
+<div id="tokenModal" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:#0008;z-index:9999;align-items:center;justify-content:center;">
+  <div style="background:#fff;padding:32px 28px;border-radius:18px;box-shadow:0 4px 24px #0006;min-width:320px;max-width:90vw;">
+    <h3 style="margin-top:0;">請輸入 Discord Bot Token</h3>
+    <input id="tokenInput" type="text" placeholder="Bot Token" style="width:100%;padding:12px 16px;font-size:17px;margin-bottom:18px;border-radius:8px;border:1px solid #ccc;" />
+    <div style="text-align:right;">
+      <button id="tokenSubmit" style="padding:10px 24px;font-size:16px;border-radius:8px;background:#007bff;color:#fff;border:none;cursor:pointer;">送出</button>
+    </div>
+    <p id="tokenError" style="color:#d00;margin-top:12px;display:none;"></p>
+  </div>
+</div>
+
+<script>
+// 檢查 BOT 狀態
+async function checkBotStatus() {
+  try {
+    const res = await fetch('/api/bot-status');
+    const data = await res.json();
+    if (!data.connected) {
+      document.getElementById('tokenModal').style.display = 'flex';
+    }
+  } catch (e) {
+    document.getElementById('tokenModal').style.display = 'flex';
+  }
+}
+checkBotStatus();
+
+// Token 送出
+const tokenSubmit = document.getElementById('tokenSubmit');
+tokenSubmit.onclick = async function() {
+  const token = document.getElementById('tokenInput').value.trim();
+  if (!token) {
+    document.getElementById('tokenError').innerText = '請輸入 Token';
+    document.getElementById('tokenError').style.display = 'block';
+    return;
+  }
+  document.getElementById('tokenError').style.display = 'none';
+  // 呼叫 API 設定 Token
+  const res = await fetch('/api/set-token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token })
+  });
+  const data = await res.json();
+  if (data.success) {
+    document.getElementById('tokenModal').style.display = 'none';
+    alert('Token 已設定，請重新啟動 BOT！');
+  } else {
+    document.getElementById('tokenError').innerText = data.error || '設定失敗';
+    document.getElementById('tokenError').style.display = 'block';
+  }
+};
+</script>
   <script src="main.js"></script>
 <!-- main.js 需支援 loadPage('lottery-record') 載入 lottery-record.html -->
 </body>

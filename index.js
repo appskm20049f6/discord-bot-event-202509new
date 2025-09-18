@@ -13,33 +13,84 @@ dotenv.config();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // ====== Discord Bot 初始化 ======
-const client = new Client({
-  intents: [
-    GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent
-  ]
-});
+let client;
+let botStatus = { connected: false, error: null };
+function startBot(token) {
+  client = new Client({
+    intents: [
+      GatewayIntentBits.Guilds,
+      GatewayIntentBits.GuildMessages,
+      GatewayIntentBits.MessageContent
+    ]
+  });
 
-client.once('ready', () => {
-  console.log(`✅ Bot 已登入：${client.user.tag}`);
-});
+  client.once('ready', () => {
+    botStatus.connected = true;
+    botStatus.error = null;
+    console.log(`✅ Bot 已登入：${client.user.tag}`);
+  });
 
-client.on('messageCreate', async message => {
-  if (message.author.bot) return;
-  if (message.content === '!ping') {
-    await message.reply('Pong!');
-  }
-});
+  client.on('messageCreate', async message => {
+    if (message.author.bot) return;
+    if (message.content === '!ping') {
+      await message.reply('Pong!');
+    }
+  });
 
-client.login(process.env.DISCORD_TOKEN);
+  client.login(token).catch(err => {
+    botStatus.connected = false;
+    botStatus.error = (err.code === 'TokenInvalid' || err.message.includes('Token')) ? 'TokenInvalid' : err.message;
+    console.error('Discord Bot 啟動失敗:', err);
+  });
+}
+startBot(process.env.DISCORD_TOKEN);
 
 // ====== Express 後台初始化 ======
 const app = express();
+// ====== Express 後台初始化 ======
+// ====== Express 後台初始化 ======
 app.use(cors());
 app.use(express.json());
 app.use('/dashboard', express.static('dashboard'));
 app.use('/data', express.static(path.join(__dirname, 'data')));
+
+// ====== BOT 狀態 API ======
+app.get('/api/bot-status', (req, res) => {
+  res.json({ connected: botStatus.connected, error: botStatus.error });
+});
+
+// ====== 設定 Discord Token API ======
+app.post('/api/set-token', express.json(), (req, res) => {
+  const { token } = req.body;
+  if (!token || typeof token !== 'string' || token.length < 10) {
+    return res.json({ success: false, error: 'Token 格式錯誤' });
+  }
+  try {
+    // 寫入 .env 檔案
+    const envPath = path.join(__dirname, '.env');
+    let envContent = '';
+    if (fs.existsSync(envPath)) {
+      envContent = fs.readFileSync(envPath, 'utf8');
+      // 移除舊的 DISCORD_TOKEN
+      envContent = envContent.replace(/DISCORD_TOKEN=.*/g, '');
+      envContent = envContent.trim();
+      if (envContent.length > 0) envContent += '\n';
+    }
+    envContent += `DISCORD_TOKEN=${token}\n`;
+    fs.writeFileSync(envPath, envContent, 'utf8');
+    // 重新啟動 BOT
+    if (client) {
+      try { client.destroy(); } catch(e) {}
+    }
+    botStatus.connected = false;
+    botStatus.error = null;
+    startBot(token);
+    res.json({ success: true });
+  } catch (err) {
+    res.json({ success: false, error: '寫入失敗: ' + err.message });
+  }
+});
+// ...existing code...
 
 // ====== Guild & Channel API ======
 app.get('/api/guilds', (req, res) => {
