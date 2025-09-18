@@ -137,11 +137,17 @@ app.post('/api/start-lottery-event', async (req, res) => {
       try {
         let fetched = [];
         let lastId;
+        let loops = 0;
         while (true) {
+          loops++;
+          if (loops > 150) break; // 防止極端情況死迴圈
+
           const fetchOptions = { limit: 100 };
           if (lastId) fetchOptions.before = lastId;
 
           const messages = await channel.messages.fetch(fetchOptions);
+          if (!messages || messages.size === 0) break;
+
           const msgs = Array.from(messages.values()).filter(
             msg => msg.createdTimestamp >= startTime &&
                    msg.createdTimestamp <= endTime &&
@@ -149,8 +155,17 @@ app.post('/api/start-lottery-event', async (req, res) => {
           );
 
           fetched = fetched.concat(msgs);
+
+          // 若 messages.size < 100，代表已到最舊一批
           if (messages.size < 100) break;
-          lastId = messages.last().id;
+
+          const lastMsg = messages.last();
+          if (!lastMsg) break;
+          lastId = lastMsg.id;
+
+          if (lastMsg.createdTimestamp < startTime) break;
+
+          await new Promise(r => setTimeout(r, 300));
         }
 
         const validLabels = optionLabels.slice(0, options.length);
@@ -377,29 +392,39 @@ app.get('/api/analyze-channel-messages', async (req, res) => {
     let loops = 0;
   const MAX_FETCH = 15000;
 
-    while (true) {
-      loops++;
-      if (loops > 50) break;
+      while (true) {
+        loops++;
+        if (loops > 150) break; // 提高迴圈上限，避免大頻道提前中斷
 
-      const options = { limit: 100 };
-      if (lastId) options.before = lastId;
+        const options = { limit: 100 };
+        if (lastId) options.before = lastId;
 
-      const messages = await channel.messages.fetch(options);
-      const msgs = Array.from(messages.values()).filter(msg =>
-        msg.createdTimestamp >= startTs &&
-        msg.createdTimestamp <= endTs &&
-        !msg.author.bot
-      );
+        const messages = await channel.messages.fetch(options);
+        if (!messages || messages.size === 0) break; // 沒有更多訊息
 
-      fetched = fetched.concat(msgs);
+        const msgs = Array.from(messages.values()).filter(msg =>
+          msg.createdTimestamp >= startTs &&
+          msg.createdTimestamp <= endTs &&
+          !msg.author.bot
+        );
 
-      if (fetched.length >= MAX_FETCH) break;
-      if (messages.size < 100) break;
-      lastId = messages.last().id;
-      if (messages.last().createdTimestamp < startTs) break;
+        fetched = fetched.concat(msgs);
 
-      await new Promise(r => setTimeout(r, 300));
-    }
+        if (fetched.length >= MAX_FETCH) break;
+
+        // 若 messages.size < 100，代表已到最舊一批
+        if (messages.size < 100) break;
+
+        // messages.last() 可能為 undefined，需判斷
+        const lastMsg = messages.last();
+        if (!lastMsg) break;
+        lastId = lastMsg.id;
+
+        // 若最舊訊息已早於 startTs，代表已抓完
+        if (lastMsg.createdTimestamp < startTs) break;
+
+        await new Promise(r => setTimeout(r, 300));
+      }
 
     // 統計分析
     const dailyStatsMap = {};

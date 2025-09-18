@@ -4,10 +4,37 @@
 
 ## 主要功能
 
-- 投票抽獎（支援問答、抽獎、活動紀錄、分布分析）
-- 訊息讀取
-- 資料分析（CSV 檔案管理、分頁搜尋/排序/輸出/刪除、圖表統計）
-- 用戶資料收集
+- **分頁式 Dashboard 前端**
+
+  - 伺服器/頻道/Thread 分組選擇（頻道分類與 Discord 順序一致，支援 thread）
+  - 分頁式管理（抽獎、投票、活動紀錄、數據分析）
+  - 檔案搜尋、排序、輸出、刪除
+  - 活動紀錄 CSV 解析與分布圖表
+  - 互動式 UI（Chart.js 圖表、分頁切換、檔案管理、進度條、匯出 JSON）
+
+- **抽獎/投票/活動管理**
+
+  - 問答抽獎（自訂題目、選項、正確答案、倒數、抽獎人數）
+  - 活動紀錄自動儲存 CSV，支援下載/刪除/查詢
+  - 活動紀錄分頁可搜尋、排序、分析、圖表化
+
+- **訊息與數據分析**
+
+  - 文字頻道/Thread 訊息批次讀取（支援熱門伺服器，最大 15000 筆）
+  - 分析每日/每週/每小時訊息趨勢、活躍時段、活躍成員分布
+  - 訊息平均長度、活躍用戶數、前 5 名佔比、最佳公告時段建議
+  - 分析結果可一鍵匯出 JSON
+
+- **API 與權限安全**
+
+  - 所有頻道/Thread 皆檢查 BOT 權限（只顯示有讀取/發送權限的）
+  - 頻道下拉選單依 Discord 分類與順序分組顯示
+  - 支援多伺服器、多頻道、多 thread 管理
+
+- **Bot 基本功能**
+  - 登入事件提示
+  - 監聽訊息並回覆 `!ping` 指令
+  - 可擴充自訂指令、互動、管理功能
 
 ## 專案目錄結構
 
@@ -53,16 +80,17 @@ DCBOT/
 - 參加人數、答對人數、抽獎人數、得獎名單統計
 - 互動式 UI（Chart.js 圖表、分頁切換、檔案管理）
 
-## Discord Bot 權限建議
+## Discord Bot 權限建議（推薦）
 
-請在 Discord Developer Portal 設定 SCOPES 與 BOT PERMISSIONS 時，勾選以下項目：
+請在 Discord Developer Portal 設定 SCOPES 與 BOT PERMISSIONS 時，建議勾選：
 
 ### SCOPES
 
 - bot
+- applications.commands
 - guilds.members.read
 
-### BOT PERMISSIONS
+### BOT PERMISSIONS（推薦）
 
 - View Channels（查看頻道）
 - Send Messages（發送訊息）
@@ -71,11 +99,12 @@ DCBOT/
 - Embed Links（如需嵌入投票或分析結果）
 - Add Reactions（如投票用 emoji）
 - Use Slash Commands（如要 slash 指令互動）
+- Manage Threads（thread 互動/管理）
 - View Audit Log（如需分析用戶行為）
 - Manage Events（如要建立活動）
 - Manage Members（如需查詢成員資料）
 
-> 建議只勾選必要權限，避免過度授權。
+> 建議只勾選必要權限，避免過度授權。thread/分析功能建議加上 Manage Threads。
 
 如需更多功能或特殊權限，請依需求調整。
 
