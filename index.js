@@ -364,35 +364,54 @@ app.get('/api/analyze-channel-messages', async (req, res) => {
     // 統計分析
     const dailyStatsMap = {};
     const hourlyStatsMap = {};
+    const weeklyStatsMap = {};
     const userMsgCount = {};
     const userFirstMsg = {};
     let totalMessages = 0;
+    let totalMsgLength = 0;
 
     fetched.forEach(msg => {
       totalMessages++;
       const ts = msg.createdTimestamp;
-      const date = new Date(ts).toISOString().slice(0, 10);
-      const hour = new Date(ts).getHours().toString().padStart(2, '0') + ':00';
+      const dateObj = new Date(ts);
+      const date = dateObj.toISOString().slice(0, 10);
+      const hour = dateObj.getHours().toString().padStart(2, '0') + ':00';
+      // 週期統計（以週一為一週起始）
+      const weekYear = dateObj.getFullYear();
+      const weekNum = Math.floor((dateObj - new Date(dateObj.getFullYear(),0,1)) / 604800000) + 1;
+      const weekKey = `${weekYear}-W${weekNum}`;
 
       dailyStatsMap[date] = (dailyStatsMap[date] || 0) + 1;
       hourlyStatsMap[hour] = (hourlyStatsMap[hour] || 0) + 1;
+      weeklyStatsMap[weekKey] = (weeklyStatsMap[weekKey] || 0) + 1;
+
+      totalMsgLength += msg.content.length;
 
       const uid = msg.author.id;
       if (!userFirstMsg[uid]) userFirstMsg[uid] = ts;
       userMsgCount[uid] = (userMsgCount[uid] || 0) + 1;
     });
 
-    const users = Object.keys(userMsgCount).map(uid => ({
-      id: uid,
-      firstMessageTime: new Date(userFirstMsg[uid]).toISOString(),
-      messageCount: userMsgCount[uid]
-    }));
+    const users = Object.keys(userMsgCount).map(uid => {
+      // 取第一則訊息的 username
+      const firstMsg = fetched.find(m => m.author.id === uid);
+      return {
+        id: uid,
+        username: firstMsg ? firstMsg.author.username : '',
+        firstMessageTime: new Date(userFirstMsg[uid]).toISOString(),
+        messageCount: userMsgCount[uid]
+      };
+    });
+
+    const averageMsgLength = totalMessages ? Math.round(totalMsgLength / totalMessages) : 0;
 
     res.json({
       totalMessages,
       dailyStats: Object.entries(dailyStatsMap).map(([date, count]) => ({ date, count })),
+      weeklyStats: Object.entries(weeklyStatsMap).map(([week, count]) => ({ week, count })),
       hourlyStats: Object.entries(hourlyStatsMap).map(([hour, count]) => ({ hour, count })),
-      users
+      users,
+      averageMsgLength
     });
 
   } catch (err) {

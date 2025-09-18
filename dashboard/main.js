@@ -308,7 +308,8 @@ window.initAnalysisPage = function() {
   if (!btn) return;
 
   btn.onclick = async function() {
-    resultArea.innerHTML = '⏳ 分析中...';
+    // 顯示進度條
+    resultArea.innerHTML = `<div id='progress-bar' style='width:100%;background:#eee;border-radius:8px;height:18px;overflow:hidden;margin-bottom:16px;'><div id='progress-inner' style='height:100%;width:0%;background:#007bff;transition:width 0.3s;'></div></div>分析中...`;
     const channelId = localStorage.channelId;
     const startDate = document.getElementById('date-start').value;
     const endDate = document.getElementById('date-end').value;
@@ -320,9 +321,18 @@ window.initAnalysisPage = function() {
       resultArea.innerHTML = '<span style="color:red;">請選擇起訖日期</span>';
       return;
     }
+    // 模擬進度條
+    let progress = 0;
+    const progressInner = document.getElementById('progress-inner');
+    const timer = setInterval(() => {
+      progress = Math.min(progress+10, 90);
+      if (progressInner) progressInner.style.width = progress+'%';
+    }, 200);
     try {
       const res = await fetch(`/api/analyze-channel-messages?channelId=${channelId}&startDate=${startDate}&endDate=${endDate}`);
       const data = await res.json();
+      clearInterval(timer);
+      if (progressInner) progressInner.style.width = '100%';
       if (data.error) {
         resultArea.innerHTML = `<span style='color:red;'>${data.error}</span>`;
         return;
@@ -330,34 +340,92 @@ window.initAnalysisPage = function() {
       let html = `<div style='font-size:18px;font-weight:bold;margin-bottom:12px;'>分析結果</div>`;
       html += `<div>訊息總數：<b>${data.totalMessages}</b></div>`;
       html += `<div>活躍用戶數：<b>${data.users.length}</b></div>`;
-      if (data.dailyStats && data.dailyStats.length) {
-        html += `<div class='chart-container'><canvas id='dailyChart'></canvas></div>`;
+      html += `<div>平均訊息長度：<b>${data.averageMsgLength}</b> 字</div>`;
+      // 匯出 JSON 按鈕
+      html += `<button id='export-json-btn' style='margin:12px 0 18px 0;padding:8px 18px;background:#28a745;color:#fff;border:none;border-radius:6px;cursor:pointer;'>匯出分析結果</button>`;
+      // 每週趨勢
+      if (data.weeklyStats && data.weeklyStats.length) {
+        html += `<div style='margin-top:18px;'>每週訊息趨勢</div><div class='chart-container'><canvas id='weeklyChart'></canvas></div>`;
       }
+      // 每日趨勢
+      if (data.dailyStats && data.dailyStats.length) {
+        html += `<div style='margin-top:18px;'>每日訊息趨勢</div><div class='chart-container'><canvas id='dailyChart'></canvas></div>`;
+      }
+      // 每小時分布
       if (data.hourlyStats && data.hourlyStats.length) {
-        html += `<div class='chart-container'><canvas id='hourlyChart'></canvas></div>`;
+        html += `<div style='margin-top:18px;'>活躍時段分布</div><div class='chart-container'><canvas id='hourlyChart'></canvas></div>`;
+      }
+      // 活躍時段建議
+      if (data.hourlyStats && data.hourlyStats.length) {
+        const maxHour = data.hourlyStats.reduce((a,b) => b.count > a.count ? b : a, data.hourlyStats[0]);
+        html += `<div style='margin-top:12px;'>建議公告/活動發布時段：<b>${maxHour.hour}</b>（此時段訊息最多）</div>`;
+      }
+      // 活躍成員分布
+      if (data.users && data.users.length) {
+        html += `<div style='margin-top:18px;'>活躍成員列表（前20）</div><ul style='max-height:180px;overflow:auto;background:#f3f3f3;padding:10px;border-radius:8px;'>`;
+        const sortedUsers = data.users.slice().sort((a,b) => b.messageCount - a.messageCount).slice(0,20);
+        sortedUsers.forEach(u => {
+          html += `<li>名稱: <b>${u.username || u.id}</b>，訊息數：<b>${u.messageCount}</b></li>`;
+        });
+        html += `</ul>`;
+        // 判斷是否集中少數人
+        const top5 = sortedUsers.slice(0,5).reduce((sum,u) => sum+u.messageCount,0);
+        const percent = data.totalMessages ? Math.round(top5/data.totalMessages*100) : 0;
+        html += `<div style='margin-top:8px;'>前5名成員佔全部訊息 <b>${percent}%</b></div>`;
       }
       resultArea.innerHTML = html;
+      // 匯出 JSON 功能
+      const exportBtn = document.getElementById('export-json-btn');
+      if (exportBtn) {
+        exportBtn.onclick = function() {
+          const blob = new Blob([JSON.stringify(data,null,2)], { type: 'application/json' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `analysis_${channelId}_${startDate}_${endDate}.json`;
+          document.body.appendChild(a);
+          a.click();
+          setTimeout(() => {
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+          }, 100);
+        };
+      }
+      // 每週趨勢圖
+      if (data.weeklyStats && data.weeklyStats.length && window.Chart) {
+        new Chart(document.getElementById('weeklyChart'), {
+          type: 'line',
+          data: {
+            labels: data.weeklyStats.map(d => d.week),
+            datasets: [{ label: '每週訊息數', data: data.weeklyStats.map(d => d.count), backgroundColor:'#17a2b8', borderColor:'#17a2b8', fill:false }]
+          },
+          options: { responsive:true, plugins:{legend:{display:true}} }
+        });
+      }
+      // 每日趨勢圖
       if (data.dailyStats && data.dailyStats.length && window.Chart) {
         new Chart(document.getElementById('dailyChart'), {
           type: 'bar',
           data: {
             labels: data.dailyStats.map(d => d.date),
-            datasets: [{ label: '訊息數', data: data.dailyStats.map(d => d.count), backgroundColor:'#007bff' }]
+            datasets: [{ label: '每日訊息數', data: data.dailyStats.map(d => d.count), backgroundColor:'#007bff' }]
           },
           options: { responsive:true, plugins:{legend:{display:false}} }
         });
       }
+      // 每小時分布圖
       if (data.hourlyStats && data.hourlyStats.length && window.Chart) {
         new Chart(document.getElementById('hourlyChart'), {
           type: 'bar',
           data: {
             labels: data.hourlyStats.map(d => d.hour),
-            datasets: [{ label: '訊息數', data: data.hourlyStats.map(d => d.count), backgroundColor:'#ffc107' }]
+            datasets: [{ label: '每小時訊息數', data: data.hourlyStats.map(d => d.count), backgroundColor:'#ffc107' }]
           },
           options: { responsive:true, plugins:{legend:{display:false}} }
         });
       }
     } catch (err) {
+      clearInterval(timer);
       resultArea.innerHTML = `<span style='color:red;'>分析失敗：${err.message}</span>`;
     }
   };
