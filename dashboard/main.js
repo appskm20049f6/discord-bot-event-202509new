@@ -391,35 +391,41 @@ window.initAnalysisPage = function() {
           }, 100);
         };
       }
-      // 每週趨勢圖
+      // 每週趨勢圖（週順推）
       if (data.weeklyStats && data.weeklyStats.length && window.Chart) {
+        const sortedWeekly = data.weeklyStats.slice().sort((a,b)=>a.week.localeCompare(b.week));
         new Chart(document.getElementById('weeklyChart'), {
           type: 'line',
           data: {
-            labels: data.weeklyStats.map(d => d.week),
-            datasets: [{ label: '每週訊息數', data: data.weeklyStats.map(d => d.count), backgroundColor:'#17a2b8', borderColor:'#17a2b8', fill:false }]
+            labels: sortedWeekly.map(d => d.week),
+            datasets: [{ label: '每週訊息數', data: sortedWeekly.map(d => d.count), backgroundColor:'#17a2b8', borderColor:'#17a2b8', fill:false }]
           },
           options: { responsive:true, plugins:{legend:{display:true}} }
         });
       }
-      // 每日趨勢圖
+      // 每日趨勢圖（日期順推）
       if (data.dailyStats && data.dailyStats.length && window.Chart) {
+        const sortedDaily = data.dailyStats.slice().sort((a,b)=>a.date.localeCompare(b.date));
         new Chart(document.getElementById('dailyChart'), {
           type: 'bar',
           data: {
-            labels: data.dailyStats.map(d => d.date),
-            datasets: [{ label: '每日訊息數', data: data.dailyStats.map(d => d.count), backgroundColor:'#007bff' }]
+            labels: sortedDaily.map(d => d.date),
+            datasets: [{ label: '每日訊息數', data: sortedDaily.map(d => d.count), backgroundColor:'#007bff' }]
           },
           options: { responsive:true, plugins:{legend:{display:false}} }
         });
       }
-      // 每小時分布圖
+      // 每小時分布圖（固定 00:00~23:00 順序）
       if (data.hourlyStats && data.hourlyStats.length && window.Chart) {
+        const hourLabels = Array.from({length:24},(_,i)=>i.toString().padStart(2,'0')+':00');
+        const hourDataMap = {};
+        data.hourlyStats.forEach(d => { hourDataMap[d.hour]=d.count; });
+        const hourData = hourLabels.map(h => hourDataMap[h]||0);
         new Chart(document.getElementById('hourlyChart'), {
           type: 'bar',
           data: {
-            labels: data.hourlyStats.map(d => d.hour),
-            datasets: [{ label: '每小時訊息數', data: data.hourlyStats.map(d => d.count), backgroundColor:'#ffc107' }]
+            labels: hourLabels,
+            datasets: [{ label: '每小時訊息數', data: hourData, backgroundColor:'#ffc107' }]
           },
           options: { responsive:true, plugins:{legend:{display:false}} }
         });
