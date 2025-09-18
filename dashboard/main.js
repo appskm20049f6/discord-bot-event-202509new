@@ -14,9 +14,11 @@ fetch('/api/guilds')
     });
     if (guilds.length) loadChannels(guilds[0].id);
   });
+
 document.getElementById('guilds').onchange = e => {
   loadChannels(e.target.value);
 };
+
 let allChannels = [];
 function loadChannels(guildId) {
   fetch(`/api/guilds/${guildId}/channels`)
@@ -26,6 +28,7 @@ function loadChannels(guildId) {
       renderChannelOptions('');
     });
 }
+
 function renderChannelOptions(keyword) {
   const chSel = document.getElementById('channels');
   chSel.innerHTML = '';
@@ -36,10 +39,19 @@ function renderChannelOptions(keyword) {
     opt.textContent = ch.name;
     chSel.appendChild(opt);
   });
+  // 自動選第一個並更新 localStorage.channelId
+  if (filtered.length) {
+    chSel.value = filtered[0].id;
+    localStorage.channelId = filtered[0].id;
+  } else {
+    localStorage.channelId = '';
+  }
 }
+
 document.getElementById('channelSearch').addEventListener('input', e => {
   renderChannelOptions(e.target.value);
 });
+
 // 單頁式分頁切換
 function loadPage(page) {
   document.querySelectorAll('.menu li').forEach(li => li.classList.remove('active'));
@@ -55,18 +67,20 @@ function loadPage(page) {
       if (page === 'lottery') initLottery();
       if (page === 'vote') initVote();
       if (page === 'record') initLotteryRecord();
-      // 活動紀錄頁載入 lottery-record.html 到主內容區，不跳轉整個頁面
+      if (page === 'analysis') initAnalysisPage();
     });
 }
-// 分頁 JS 集中於主頁
+
+// ====== 抽獎分頁 ======
 function initLottery() {
-  // 初始化抽獎分頁互動
   window.submitLottery = function() {
     const title = document.getElementById('lotteryTitle').value;
     const answer = document.getElementById('lotteryAnswer').value;
     const time = document.getElementById('lotteryTime').value;
     const winnerCount = document.getElementById('lotteryWinnerCount').value;
-    const options = ['optionA','optionB','optionC','optionD'].map(n => document.getElementsByName(n)[0].value.trim()).filter(Boolean);
+    const options = ['optionA','optionB','optionC','optionD']
+      .map(n => document.getElementsByName(n)[0].value.trim())
+      .filter(Boolean);
     const channelId = document.getElementById('channels')?.value;
     if (!channelId) {
       document.getElementById('lotteryCreateResult').textContent = '⚠️ 請先選擇發布頻道';
@@ -95,6 +109,7 @@ function initLottery() {
       }
     });
   };
+
   window.loadLotteryList = function() {
     fetch('/api/lottery')
       .then(res => res.json())
@@ -112,8 +127,9 @@ function initLottery() {
       });
   };
 }
+
+// ====== 投票分頁 ======
 function initVote() {
-  // 初始化投票分頁互動
   window.createVote = function() {
     alert('這裡可以彈出新建投票的表單');
   };
@@ -124,6 +140,8 @@ function initVote() {
         list.map(item => `<div>投票：${item.name}</div>`).join('');
     });
 }
+
+// ====== 抽獎紀錄分頁 ======
 window.initLotteryRecord = function() {
   const fileList = document.getElementById('file-list');
   const analysisArea = document.getElementById('analysis-area');
@@ -131,15 +149,17 @@ window.initLotteryRecord = function() {
   fetch('/api/lottery')
     .then(res => res.json())
     .then(list => {
-      // 檔案搜尋與排序 UI
       const searchBarHtml = `<input id='record-search' type='text' placeholder='搜尋檔案...' style='padding:8px 16px;font-size:16px;border-radius:8px;border:1px solid #ccc;width:220px;'>`;
       const sortBarHtml = `<select id='record-sort' style='padding:8px 12px;font-size:16px;border-radius:8px;border:1px solid #ccc;'>
         <option value='new'>最新優先</option>
         <option value='old'>最舊優先</option>
         <option value='name'>檔名排序</option>
       </select>`;
-      // 讓搜尋與排序橫向排列且置中
-      fileList.parentElement.insertAdjacentHTML('afterbegin', `<div style='display:flex;justify-content:center;align-items:center;gap:18px;margin-bottom:18px;'>${searchBarHtml}${sortBarHtml}</div>`);
+      fileList.parentElement.insertAdjacentHTML(
+        'afterbegin',
+        `<div style='display:flex;justify-content:center;align-items:center;gap:18px;margin-bottom:18px;'>${searchBarHtml}${sortBarHtml}</div>`
+      );
+
       let allFiles = list.slice();
       function renderFileList() {
         let keyword = document.getElementById('record-search').value.trim();
@@ -173,7 +193,7 @@ window.initLotteryRecord = function() {
       document.getElementById('record-search').oninput = renderFileList;
       document.getElementById('record-sort').onchange = renderFileList;
       renderFileList();
-      // 刪除檔案 API
+
       async function deleteFile(fileName) {
         if (!confirm(`確定要刪除檔案？\n${fileName}`)) return;
         const res = await fetch(`/api/delete-csv?name=${encodeURIComponent(fileName)}`, { method: 'DELETE' });
@@ -185,7 +205,7 @@ window.initLotteryRecord = function() {
           alert('刪除失敗');
         }
       }
-      // 檔案分析
+
       async function showAnalysis(fileUrl, fileName) {
         fileList.style.display = 'none';
         analysisArea.style.display = '';
@@ -195,30 +215,29 @@ window.initLotteryRecord = function() {
           if (!res.ok) throw new Error('檔案載入失敗');
           const text = await res.text();
           const lines = text.split(/\r?\n/).filter(l => l.trim());
+
           let optionLine = lines.find(l => l.startsWith('選項,'));
           let options = optionLine ? optionLine.replace('選項,','').split(' | ') : [];
           let answerStart = lines.findIndex(l => l.startsWith('DC名稱,'));
           let answerRows = answerStart >= 0 ? lines.slice(answerStart+1) : [];
-          // 解析選項編號與文字
+
           let optionMap = {};
           options.forEach((opt, idx) => {
-            const label = String.fromCharCode(65 + idx); // A/B/C/D...
+            const label = String.fromCharCode(65 + idx);
             optionMap[label] = opt;
           });
-          // 統計回答分布（根據回答內容 A/B/C/D）
+
           let counts = {};
-          Object.keys(optionMap).forEach(label => {
-            counts[label] = 0;
-          });
+          Object.keys(optionMap).forEach(label => { counts[label] = 0; });
           answerRows.forEach(row => {
             let cols = row.split(',');
             let ans = cols[2];
             if (counts.hasOwnProperty(ans)) counts[ans]++;
           });
-          // 顯示選項文字與人數
+
           const labels = Object.keys(optionMap).map(label => `${label}：${optionMap[label]}`);
           const data = Object.keys(optionMap).map(label => counts[label]);
-          // 統計資訊
+
           const totalParticipants = answerRows.length;
           let winnerLine = lines.find(l => l.startsWith('抽獎人數,'));
           let winnerCount = winnerLine ? winnerLine.split(',')[1] : '';
@@ -230,7 +249,7 @@ window.initLotteryRecord = function() {
             if (cols[2] === correctAnswer) winners.push({ name: cols[0], id: cols[1] });
           });
           let picked = winners.slice(0, Number(winnerCount));
-          // 解析檔名格式
+
           const fileNameMatch = fileName.match(/^【([^】]+)】([^_]+)_(.+?)\.csv$/);
           let displayTitle = fileName;
           if (fileNameMatch) {
@@ -239,10 +258,10 @@ window.initLotteryRecord = function() {
             const time = fileNameMatch[3].replace(/-/g, ':');
             displayTitle = `【${date}】${title} ${time}`;
           }
-          // 開頭題目區塊
+
           let headerHtml = `<div style='margin-bottom:10px;font-size:18px;font-weight:bold;'>${displayTitle}</div>
             <div style='margin-bottom:14px;font-size:16px;'>預計抽出 <b>${winnerCount}</b> 位幸運兒獲得寶藏</div>`;
-          // 統計區塊 HTML
+
           let statHtml = `<div style='margin-bottom:18px;font-size:17px;'>
             參加人數：<b>${totalParticipants}</b><br>
             答對人數：<b>${winners.length}</b><br>
@@ -252,10 +271,12 @@ window.initLotteryRecord = function() {
             <div style='margin:8px 0;'>中獎者：</div>
             <ul>${picked.length ? picked.map(u => `<li>${u.name} (${u.id})</li>`).join('') : '<li>無</li>'}</ul>
           </div>`;
+
           analysisArea.innerHTML = `<button class='back-btn' onclick='backToList()'>← 返回紀錄列表</button>
             ${headerHtml}
             ${statHtml}
             <div class='chart-container'><canvas id='answerChart'></canvas></div>`;
+
           new Chart(document.getElementById('answerChart'), {
             type: 'bar',
             data: {
@@ -266,20 +287,90 @@ window.initLotteryRecord = function() {
                 backgroundColor: ['#007bff','#00c6ff','#ffc107','#dc3545','#28a745','#6f42c1','#fd7e14']
               }]
             },
-            options: {
-              responsive: true,
-              plugins: { legend: { display: false } }
-            }
+            options: { responsive: true, plugins: { legend: { display: false } } }
           });
         } catch (err) {
           analysisArea.innerHTML = `<button class='back-btn' onclick='backToList()'>← 返回紀錄列表</button><div style='color:red;'>載入失敗：${err.message}</div>`;
         }
       }
+
       window.backToList = function() {
         fileList.style.display = '';
         analysisArea.style.display = 'none';
       }
     });
 }
+
+// ====== 分析分頁 ======
+window.initAnalysisPage = function() {
+  const btn = document.getElementById('analyze-btn');
+  const resultArea = document.getElementById('result-area');
+  if (!btn) return;
+
+  btn.onclick = async function() {
+    resultArea.innerHTML = '⏳ 分析中...';
+    const channelId = localStorage.channelId;
+    const startDate = document.getElementById('date-start').value;
+    const endDate = document.getElementById('date-end').value;
+    if (!channelId) {
+      resultArea.innerHTML = '<span style="color:red;">請先在主頁選擇頻道</span>';
+      return;
+    }
+    if (!startDate || !endDate) {
+      resultArea.innerHTML = '<span style="color:red;">請選擇起訖日期</span>';
+      return;
+    }
+    try {
+      const res = await fetch(`/api/analyze-channel-messages?channelId=${channelId}&startDate=${startDate}&endDate=${endDate}`);
+      const data = await res.json();
+      if (data.error) {
+        resultArea.innerHTML = `<span style='color:red;'>${data.error}</span>`;
+        return;
+      }
+      let html = `<div style='font-size:18px;font-weight:bold;margin-bottom:12px;'>分析結果</div>`;
+      html += `<div>訊息總數：<b>${data.totalMessages}</b></div>`;
+      html += `<div>活躍用戶數：<b>${data.users.length}</b></div>`;
+      if (data.dailyStats && data.dailyStats.length) {
+        html += `<div class='chart-container'><canvas id='dailyChart'></canvas></div>`;
+      }
+      if (data.hourlyStats && data.hourlyStats.length) {
+        html += `<div class='chart-container'><canvas id='hourlyChart'></canvas></div>`;
+      }
+      resultArea.innerHTML = html;
+      if (data.dailyStats && data.dailyStats.length && window.Chart) {
+        new Chart(document.getElementById('dailyChart'), {
+          type: 'bar',
+          data: {
+            labels: data.dailyStats.map(d => d.date),
+            datasets: [{ label: '訊息數', data: data.dailyStats.map(d => d.count), backgroundColor:'#007bff' }]
+          },
+          options: { responsive:true, plugins:{legend:{display:false}} }
+        });
+      }
+      if (data.hourlyStats && data.hourlyStats.length && window.Chart) {
+        new Chart(document.getElementById('hourlyChart'), {
+          type: 'bar',
+          data: {
+            labels: data.hourlyStats.map(d => d.hour),
+            datasets: [{ label: '訊息數', data: data.hourlyStats.map(d => d.count), backgroundColor:'#ffc107' }]
+          },
+          options: { responsive:true, plugins:{legend:{display:false}} }
+        });
+      }
+    } catch (err) {
+      resultArea.innerHTML = `<span style='color:red;'>分析失敗：${err.message}</span>`;
+    }
+  };
+};
+
+// analysis.html 載入時自動初始化
+if (location.pathname.endsWith('analysis.html')) initAnalysisPage();
+
 // 預設載入抽獎分頁
 loadPage('lottery');
+
+document.getElementById('channels').addEventListener('change', function(e) {
+  localStorage.channelId = e.target.value;
+});
+
+
