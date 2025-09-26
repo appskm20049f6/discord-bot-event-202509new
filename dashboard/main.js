@@ -104,7 +104,7 @@ function loadPage(page) {
     .then(html => {
       document.getElementById('main-content').innerHTML = html;
       if (page === 'lottery') initLottery();
-      if (page === 'vote') initVote();
+      if (page === 'manual-lottery') initManualLottery();
       if (page === 'record') initLotteryRecord();
       if (page === 'analysis') initAnalysisPage();
     });
@@ -337,6 +337,45 @@ window.initLotteryRecord = function() {
         fileList.style.display = '';
         analysisArea.style.display = 'none';
       }
+    });
+}
+
+// ====== 手動抽獎分頁 ======
+function initManualLottery() {
+  window.startManualLottery = function() {
+    const topicId = document.getElementById('manualLotteryTopic').value;
+    const endTime = document.getElementById('manualLotteryEndTime').value;
+    if (!topicId || !endTime) {
+      document.getElementById('manualLotteryResult').textContent = '⚠️ 請選擇題目並設定結束時間';
+      return;
+    }
+    fetch('/api/manual-lottery', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ topicId, endTime })
+    })
+    .then(res => res.json())
+    .then(result => {
+      if (result.success) {
+        document.getElementById('manualLotteryResult').textContent = '✅ 已開始抽獎流程，結束後將自動公布得獎名單！';
+      } else {
+        document.getElementById('manualLotteryResult').textContent = '❌ 發布失敗：' + (result.error || '未知錯誤');
+      }
+    });
+  };
+
+  // 載入題目列表
+  fetch('/api/lottery-topics')
+    .then(res => res.json())
+    .then(list => {
+      const sel = document.getElementById('manualLotteryTopic');
+      sel.innerHTML = '';
+      list.forEach(topic => {
+        const opt = document.createElement('option');
+        opt.value = topic.id;
+        opt.textContent = topic.question;
+        sel.appendChild(opt);
+      });
     });
 }
 

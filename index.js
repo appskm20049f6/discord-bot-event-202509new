@@ -24,7 +24,7 @@ function startBot(token) {
     ]
   });
 
-  client.once('ready', () => {
+  client.once('clientReady', () => {
     botStatus.connected = true;
     botStatus.error = null;
     console.log(`✅ Bot 已登入：${client.user.tag}`);
