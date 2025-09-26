@@ -258,34 +258,41 @@ window.initLotteryRecord = function() {
           let answerStart = lines.findIndex(l => l.startsWith('DC名稱,'));
           let answerRows = answerStart >= 0 ? lines.slice(answerStart+1) : [];
 
-          let optionMap = {};
-          options.forEach((opt, idx) => {
-            const label = String.fromCharCode(65 + idx);
-            optionMap[label] = opt;
-          });
+      // 只取回答行（遇到空行或 '中獎者' 行就停止）
+      let pureAnswerRows = [];
+      for (let row of answerRows) {
+        if (!row.trim() || row.startsWith('中獎者')) break;
+        pureAnswerRows.push(row);
+      }
 
-          let counts = {};
-          Object.keys(optionMap).forEach(label => { counts[label] = 0; });
-          answerRows.forEach(row => {
-            let cols = row.split(',');
-            let ans = cols[2];
-            if (counts.hasOwnProperty(ans)) counts[ans]++;
-          });
+      let optionMap = {};
+      options.forEach((opt, idx) => {
+        const label = String.fromCharCode(65 + idx);
+        optionMap[label] = opt;
+      });
 
-          const labels = Object.keys(optionMap).map(label => `${label}：${optionMap[label]}`);
-          const data = Object.keys(optionMap).map(label => counts[label]);
+      let counts = {};
+      Object.keys(optionMap).forEach(label => { counts[label] = 0; });
+      pureAnswerRows.forEach(row => {
+        let cols = row.split(',');
+        let ans = cols[2];
+        if (counts.hasOwnProperty(ans)) counts[ans]++;
+      });
 
-          const totalParticipants = answerRows.length;
-          let winnerLine = lines.find(l => l.startsWith('抽獎人數,'));
-          let winnerCount = winnerLine ? winnerLine.split(',')[1] : '';
-          let answerLine = lines.find(l => l.startsWith('正確答案,'));
-          let correctAnswer = answerLine ? answerLine.split(',')[1].toUpperCase() : '';
-          let winners = [];
-          answerRows.forEach(row => {
-            let cols = row.split(',');
-            if (cols[2] === correctAnswer) winners.push({ name: cols[0], id: cols[1] });
-          });
-          let picked = winners.slice(0, Number(winnerCount));
+      const labels = Object.keys(optionMap).map(label => `${label}：${optionMap[label]}`);
+      const data = Object.keys(optionMap).map(label => counts[label]);
+
+      const totalParticipants = pureAnswerRows.length;
+      let winnerLine = lines.find(l => l.startsWith('抽獎人數,'));
+      let winnerCount = winnerLine ? winnerLine.split(',')[1] : '';
+      let answerLine = lines.find(l => l.startsWith('正確答案,'));
+      let correctAnswer = answerLine ? answerLine.split(',')[1].toUpperCase() : '';
+      let winners = [];
+      pureAnswerRows.forEach(row => {
+        let cols = row.split(',');
+        if (cols[2] === correctAnswer) winners.push({ name: cols[0], id: cols[1] });
+      });
+      let picked = winners.slice(0, Number(winnerCount));
 
           const fileNameMatch = fileName.match(/^【([^】]+)】([^_]+)_(.+?)\.csv$/);
           let displayTitle = fileName;
