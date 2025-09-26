@@ -115,7 +115,6 @@ function initLottery() {
   window.submitLottery = function() {
     const title = document.getElementById('lotteryTitle').value;
     const answer = document.getElementById('lotteryAnswer').value;
-    const time = document.getElementById('lotteryTime').value;
     const winnerCount = document.getElementById('lotteryWinnerCount').value;
     const options = ['optionA','optionB','optionC','optionD']
       .map(n => document.getElementsByName(n)[0].value.trim())
@@ -132,7 +131,6 @@ function initLottery() {
         question: title,
         options,
         answer,
-        countdown: Number(time),
         winners: Number(winnerCount),
         channelId
       })
@@ -345,14 +343,15 @@ function initManualLottery() {
   window.startManualLottery = function() {
     const topicId = document.getElementById('manualLotteryTopic').value;
     const endTime = document.getElementById('manualLotteryEndTime').value;
-    if (!topicId || !endTime) {
-      document.getElementById('manualLotteryResult').textContent = '⚠️ 請選擇題目並設定結束時間';
+    const channelId = localStorage.channelId;
+    if (!topicId || !endTime || !channelId) {
+      document.getElementById('manualLotteryResult').textContent = '⚠️ 請選擇題目、結束時間與頻道';
       return;
     }
     fetch('/api/manual-lottery', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ topicId, endTime })
+      body: JSON.stringify({ topicId, endTime, channelId })
     })
     .then(res => res.json())
     .then(result => {

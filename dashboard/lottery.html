@@ -45,10 +45,7 @@
         <label>設定答案：</label>
         <input type="text" id="lotteryAnswer" class="select-box" placeholder="請輸入正確答案 (如 A、B)" required />
       </div>
-      <div class="form-group">
-        <label>設定回答時間（秒）：</label>
-        <input type="number" id="lotteryTime" class="select-box" min="1" value="30" required />
-      </div>
+      <!-- 回答時間已移除 -->
       <div class="form-group">
         <label>設定抽獎人數：</label>
         <input type="number" id="lotteryWinnerCount" class="select-box" min="1" value="1" required />
@@ -66,13 +63,11 @@
 function submitLottery() {
   const title = document.getElementById('lotteryTitle').value;
   const answer = document.getElementById('lotteryAnswer').value;
-  const time = document.getElementById('lotteryTime').value;
   const winnerCount = document.getElementById('lotteryWinnerCount').value;
   const options = ['optionA','optionB','optionC','optionD'].map(n => document.getElementsByName(n)[0].value.trim()).filter(Boolean);
   const channelId = window.parent && window.parent.document
     ? window.parent.document.getElementById('channels')?.value
     : (document.getElementById('channels') ? document.getElementById('channels').value : null);
-  console.log('送出抽獎', { channelId, options });
   if (!channelId) {
     document.getElementById('lotteryCreateResult').textContent = '⚠️ 請先選擇發布頻道';
     return;
@@ -85,14 +80,12 @@ function submitLottery() {
         question: title,
         options,
         answer,
-        countdown: Number(time),
         winners: Number(winnerCount),
         channelId
       })
     })
     .then(res => res.json())
     .then(result => {
-      console.log('API回傳', result);
       if (result.success) {
         document.getElementById('lotteryCreateResult').textContent = '✅ 抽獎活動已發布！';
         document.getElementById('lotteryForm').reset();

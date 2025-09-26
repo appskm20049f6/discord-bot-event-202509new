@@ -1,4 +1,5 @@
 // index.js - Discord Bot + Express 後台主程式
+// index.js - Discord Bot + Express 後台主程式
 import { fileURLToPath } from 'url';
 import { Client, GatewayIntentBits, ChannelType } from 'discord.js';
 import dotenv from 'dotenv';
@@ -47,8 +48,29 @@ startBot(process.env.DISCORD_TOKEN);
 
 // ====== Express 後台初始化 ======
 const app = express();
-// ====== Express 後台初始化 ======
-// ====== Express 後台初始化 ======
+app.use(cors());
+app.use(express.json());
+app.use('/dashboard', express.static('dashboard'));
+app.use('/data', express.static(path.join(__dirname, 'data')));
+
+// ====== 抽獎題目列表 API ======
+app.get('/api/lottery-topics', (req, res) => {
+  const dir = path.join(__dirname, 'data');
+  if (!fs.existsSync(dir)) return res.json([]);
+  const files = fs.readdirSync(dir).filter(f => f.endsWith('.csv'));
+  const topics = [];
+  files.forEach(f => {
+    const filePath = path.join(dir, f);
+    const lines = fs.readFileSync(filePath, 'utf8').split(/\r?\n/);
+    const questionLine = lines.find(l => l.startsWith('題目,'));
+    if (questionLine) {
+      const question = questionLine.replace('題目,', '').trim();
+      topics.push({ id: f, question });
+    }
+  });
+  res.json(topics);
+});
+// ...existing code...
 app.use(cors());
 app.use(express.json());
 app.use('/dashboard', express.static('dashboard'));
@@ -164,116 +186,137 @@ app.post('/api/send', async (req, res) => {
 });
 
 // ====== 抽獎活動 API ======
+// ====== 手動抽獎 API ======
+app.post('/api/manual-lottery', async (req, res) => {
+  const { topicId, endTime } = req.body;
+  try {
+    // 1. 讀取 CSV，取得題目、選項、答案、抽獎人數、發布時間、頻道
+    const filePath = path.join(__dirname, 'data', topicId);
+    if (!fs.existsSync(filePath)) throw new Error('題目檔案不存在');
+    const lines = fs.readFileSync(filePath, 'utf8').split(/\r?\n/);
+    const questionLine = lines.find(l => l.startsWith('題目,'));
+    const optionsLine = lines.find(l => l.startsWith('選項,'));
+    const answerLine = lines.find(l => l.startsWith('正確答案,'));
+    const winnerLine = lines.find(l => l.startsWith('抽獎人數,'));
+    if (!questionLine || !optionsLine || !answerLine || !winnerLine) throw new Error('題目檔案格式錯誤');
+    const question = questionLine.replace('題目,','').trim();
+    const options = optionsLine.replace('選項,','').split(' | ');
+    const answer = answerLine.replace('正確答案,','').trim().toUpperCase();
+    const winners = Number(winnerLine.replace('抽獎人數,','').trim());
+
+    // 2. 解析檔名取得發布時間
+    // 檔名格式：【YYYY-MM-DD】題目_時分秒.csv
+    const match = topicId.match(/^【(\d{4}-\d{2}-\d{2})】(.+?)_(\d{2}-\d{2}-\d{2})\.csv$/);
+    if (!match) throw new Error('檔名格式錯誤');
+    const dateStr = match[1];
+    const timeStr = match[3].replace(/-/g, ':');
+    const startTime = new Date(`${dateStr}T${timeStr}`).getTime();
+
+    // 3. 取得頻道ID（目前設計：從 CSV 取得，若無則由前端傳遞）
+    // 這裡假設頻道ID由前端 localStorage.channelId 傳遞
+    const channelId = req.body.channelId || (req.body.channelId === '' ? null : null);
+    // 若頻道ID未傳遞，則回傳錯誤
+    if (!channelId) throw new Error('請選擇頻道');
+    const channel = client.channels.cache.get(channelId);
+    if (!channel) throw new Error('頻道不存在');
+
+    // 4. 解析結束時間
+    const endTs = new Date(endTime).getTime();
+    if (isNaN(endTs)) throw new Error('結束時間格式錯誤');
+
+    // 5. 回溯訊息
+    let fetched = [];
+    let lastId;
+    let loops = 0;
+    const optionLabels = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').slice(0, options.length);
+    while (true) {
+      loops++;
+      if (loops > 150) break;
+      const fetchOptions = { limit: 100 };
+      if (lastId) fetchOptions.before = lastId;
+      const messages = await channel.messages.fetch(fetchOptions);
+      if (!messages || messages.size === 0) break;
+      const msgs = Array.from(messages.values()).filter(
+        msg => msg.createdTimestamp >= startTime &&
+               msg.createdTimestamp <= endTs &&
+               !msg.author.bot &&
+               optionLabels.includes(msg.content.trim().toUpperCase())
+      );
+      fetched = fetched.concat(msgs);
+      if (messages.size < 100) break;
+      const lastMsg = messages.last();
+      if (!lastMsg) break;
+      lastId = lastMsg.id;
+      if (lastMsg.createdTimestamp < startTime) break;
+      await new Promise(r => setTimeout(r, 300));
+    }
+
+    // 6. 整理回答記錄
+    const userAnswers = {};
+    fetched.sort((a, b) => a.createdTimestamp - b.createdTimestamp).forEach(msg => {
+      if (!userAnswers[msg.author.id]) {
+        userAnswers[msg.author.id] = {
+          name: msg.author.username,
+          id: msg.author.id,
+          answer: msg.content.trim().toUpperCase(),
+          time: new Date(msg.createdTimestamp).toISOString()
+        };
+      }
+    });
+
+    // 7. 抽獎
+    const correctUsers = Object.values(userAnswers).filter(u => u.answer === answer).map(u => u.id);
+    let resultMsg;
+    let winnersList = [];
+    if (correctUsers.length === 0) {
+      resultMsg = '可惜啦～這次沒有勇者解開謎題。';
+    } else {
+      const shuffled = correctUsers.sort(() => Math.random() - 0.5);
+      winnersList = shuffled.slice(0, winners);
+      resultMsg = `恭喜勇者成功解開謎題！\n` + winnersList.map(u => `<@${u}>`).join('\n');
+    }
+
+    // 8. 寫回 CSV
+    let csv = `題目,${question}\n選項,${options.join(' | ')}\n正確答案,${answer}\n抽獎人數,${winners}\n\nDC名稱,ID,回答內容,回答時間\n`;
+    Object.values(userAnswers).forEach(u => {
+      csv += `${u.name},${u.id},${u.answer},${u.time}\n`;
+    });
+    fs.writeFileSync(filePath, csv, 'utf8');
+
+    // 9. 回傳結果
+    res.json({ success: true, winners: winnersList });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
 let currentLottery = null;
 
 app.post('/api/start-lottery-event', async (req, res) => {
-  const { question, options, answer, countdown, winners, channelId } = req.body;
+  const { question, options, answer, winners, channelId } = req.body;
   try {
-    if (currentLottery) throw new Error('已有抽獎活動進行中');
     const channel = client.channels.cache.get(channelId);
     if (!channel) throw new Error('Channel not found');
 
     const optionLabels = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
     const optionList = options.map((opt, idx) => `${optionLabels[idx]}. ${opt}`).join('\n');
 
-    const msg = `🗡️【冒險任務啟動】\n勇者啊！前方有一道試煉等你通過。\n題目：${question}\n\n選項：\n${optionList}\n\n⏳ ${countdown} 秒內作答，輸入答案編號（A、B、C...）\n將抽出 ${winners} 位勇者獲得寶藏！`;
+    const msg = `🗡️【冒險任務啟動】\n勇者啊！前方有一道試煉等你通過。\n題目：${question}\n\n選項：\n${optionList}\n\n將抽出 ${winners} 位勇者獲得寶藏！`;
     await channel.send(msg);
 
-    const startTime = Date.now();
-    const endTime = startTime + countdown * 1000;
-    currentLottery = { answer, winners, channelId, startTime, endTime };
+    // 立即建立 CSV
+    const dt = new Date();
+    const dateStr = dt.toISOString().slice(0, 10);
+    const timeStr = dt.toTimeString().slice(0, 8).replace(/:/g, '-');
+    const safeQ = question.replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, '').slice(0, 10);
 
-    // 倒數結束後處理結果
-    setTimeout(async () => {
-      try {
-        let fetched = [];
-        let lastId;
-        let loops = 0;
-        while (true) {
-          loops++;
-          if (loops > 150) break; // 防止極端情況死迴圈
+    const dir = path.join(__dirname, 'data');
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir);
 
-          const fetchOptions = { limit: 100 };
-          if (lastId) fetchOptions.before = lastId;
+    const fileName = `【${dateStr}】${safeQ}_${timeStr}.csv`;
+    const filePath = path.join(dir, fileName);
 
-          const messages = await channel.messages.fetch(fetchOptions);
-          if (!messages || messages.size === 0) break;
-
-          const msgs = Array.from(messages.values()).filter(
-            msg => msg.createdTimestamp >= startTime &&
-                   msg.createdTimestamp <= endTime &&
-                   !msg.author.bot
-          );
-
-          fetched = fetched.concat(msgs);
-
-          // 若 messages.size < 100，代表已到最舊一批
-          if (messages.size < 100) break;
-
-          const lastMsg = messages.last();
-          if (!lastMsg) break;
-          lastId = lastMsg.id;
-
-          if (lastMsg.createdTimestamp < startTime) break;
-
-          await new Promise(r => setTimeout(r, 300));
-        }
-
-        const validLabels = optionLabels.slice(0, options.length);
-        const sortedMsgs = fetched
-          .filter(msg => validLabels.includes(msg.content.trim().toUpperCase()))
-          .sort((a, b) => a.createdTimestamp - b.createdTimestamp);
-
-        const userAnswers = {};
-        sortedMsgs.forEach(msg => {
-          if (!userAnswers[msg.author.id]) {
-            userAnswers[msg.author.id] = {
-              name: msg.author.username,
-              id: msg.author.id,
-              answer: msg.content.trim().toUpperCase(),
-              time: new Date(msg.createdTimestamp).toISOString()
-            };
-          }
-        });
-
-        const correctUsers = Object.values(userAnswers)
-          .filter(u => u.answer === answer.toUpperCase())
-          .map(u => u.id);
-
-        let resultMsg;
-        if (correctUsers.length === 0) {
-          resultMsg = '可惜啦～這次沒有勇者解開謎題。';
-        } else {
-          const shuffled = correctUsers.sort(() => Math.random() - 0.5);
-          const winnersList = shuffled.slice(0, winners);
-          resultMsg = `恭喜勇者成功解開謎題！\n` + winnersList.map(u => `<@${u}>`).join('\n');
-        }
-        await channel.send(`⌛【任務結束】\n${resultMsg}`);
-
-        // 寫入 CSV
-        const dt = new Date(startTime);
-        const dateStr = dt.toISOString().slice(0, 10);
-        const timeStr = dt.toTimeString().slice(0, 8).replace(/:/g, '-');
-        const safeQ = question.replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, '').slice(0, 10);
-
-        const dir = path.join(__dirname, 'data');
-        if (!fs.existsSync(dir)) fs.mkdirSync(dir);
-
-        const fileName = `【${dateStr}】${safeQ}_${timeStr}.csv`;
-        const filePath = path.join(dir, fileName);
-
-        let csv = `題目,${question}\n選項,${options.join(' | ')}\n正確答案,${answer}\n抽獎人數,${winners}\n\nDC名稱,ID,回答內容,回答時間\n`;
-        Object.values(userAnswers).forEach(u => {
-          csv += `${u.name},${u.id},${u.answer},${u.time}\n`;
-        });
-
-        fs.writeFileSync(filePath, csv, 'utf8');
-      } catch (err) {
-        console.error('抽獎活動回溯錯誤:', err);
-        await channel.send('抽獎活動結束，但回溯訊息時發生錯誤。');
-      }
-      currentLottery = null;
-    }, countdown * 1000);
+    let csv = `題目,${question}\n選項,${options.join(' | ')}\n正確答案,${answer}\n抽獎人數,${winners}\n`;
+    fs.writeFileSync(filePath, csv, 'utf8');
 
     res.json({ success: true });
   } catch (err) {
