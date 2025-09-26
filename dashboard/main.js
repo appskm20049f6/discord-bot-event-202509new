@@ -462,11 +462,41 @@ window.initAnalysisPage = function() {
       const exportBtn = document.getElementById('export-json-btn');
       if (exportBtn) {
         exportBtn.onclick = function() {
-          const blob = new Blob([JSON.stringify(data,null,2)], { type: 'application/json' });
+          let csv = '';
+          csv += `頻道ID,${channelId}\n`;
+          csv += `分析區間,${startDate} ~ ${endDate}\n`;
+          csv += `訊息總數,${data.totalMessages}\n`;
+          csv += `活躍用戶數,${data.users.length}\n`;
+          csv += `平均訊息長度,${data.averageMsgLength}\n`;
+          // 每日訊息分布由最早到最近排序
+          csv += `\n每日訊息分布\n日期,訊息數\n`;
+          if (data.dailyStats) {
+            const sortedDaily = data.dailyStats.slice().sort((a,b)=>a.date.localeCompare(b.date));
+            sortedDaily.forEach(d => { csv += `${d.date},${d.count}\n`; });
+          }
+          // 每週訊息分布由最早到最近排序
+          csv += `\n每週訊息分布\n週期,訊息數\n`;
+          if (data.weeklyStats) {
+            const sortedWeekly = data.weeklyStats.slice().sort((a,b)=>a.week.localeCompare(b.week));
+            sortedWeekly.forEach(d => { csv += `${d.week},${d.count}\n`; });
+          }
+          // 每小時訊息分布固定 00:00~23:00 順序
+          csv += `\n每小時訊息分布\n時段,訊息數\n`;
+          const hourLabels = Array.from({length:24},(_,i)=>i.toString().padStart(2,'0')+':00');
+          const hourDataMap = {};
+          if (data.hourlyStats) data.hourlyStats.forEach(d => { hourDataMap[d.hour]=d.count; });
+          hourLabels.forEach(h => { csv += `${h},${hourDataMap[h]||0}\n`; });
+          // 活躍成員依訊息量最多排最上
+          csv += `\n活躍成員列表\n名稱,ID,訊息數\n`;
+          if (data.users) {
+            const sortedUsers = data.users.slice().sort((a,b)=>b.messageCount-a.messageCount);
+            sortedUsers.forEach(u => { csv += `${u.username || u.id},${u.id},${u.messageCount}\n`; });
+          }
+          const blob = new Blob([csv], { type: 'text/csv' });
           const url = URL.createObjectURL(blob);
           const a = document.createElement('a');
           a.href = url;
-          a.download = `analysis_${channelId}_${startDate}_${endDate}.json`;
+          a.download = `analysis_${channelId}_${startDate}_${endDate}.csv`;
           document.body.appendChild(a);
           a.click();
           setTimeout(() => {
