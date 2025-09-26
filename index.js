@@ -281,9 +281,28 @@ app.post('/api/manual-lottery', async (req, res) => {
     Object.values(userAnswers).forEach(u => {
       csv += `${u.name},${u.id},${u.answer},${u.time}\n`;
     });
+    // 加入中獎者名單
+    if (winnersList.length) {
+      csv += `\n中獎者`;
+      winnersList.forEach(uid => {
+        const winner = userAnswers[uid];
+        if (winner) csv += `,${winner.name},${winner.id}`;
+      });
+      csv += `\n`;
+    }
     fs.writeFileSync(filePath, csv, 'utf8');
 
-    // 9. 回傳結果
+    // 9. 公布得獎者名單至頻道（公告形式）
+    if (channel && winnersList.length) {
+      let announceMsg = `📢【問答抽獎結果公告】\n題目：${question}\n`;
+      announceMsg += `抽獎人數：${winners}\n`;
+      announceMsg += `中獎者：\n`;
+      winnersList.forEach(uid => {
+        const winner = userAnswers[uid];
+        if (winner) announceMsg += `- ${winner.name} (<@${winner.id}>)\n`;
+      });
+      await channel.send({ content: announceMsg, allowedMentions: { users: winnersList }, flags: 4096 }); // 4096 = Suppress embeds, mimic announcement
+    }
     res.json({ success: true, winners: winnersList });
   } catch (err) {
     res.status(400).json({ error: err.message });
